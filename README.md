@@ -8,13 +8,11 @@ An AI-driven meal planning assistant integrated with a local MCP server that gen
 - Track nutritional macros and caloric intake
 - Manage grocery lists automatically
 - Handle state persistence across sessions
-- Web search integration for missing nutritional data
 
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev) — tool version manager
 - [uv](https://docs.astral.sh/uv/) — extremely fast Python package and project manager
-- Internet connection (optional, for web search functionality)
 
 ## Installation
 
@@ -180,8 +178,7 @@ meal-planner/
 │   ├── tools/                    # Core logic modules
 │   │   ├── generate_plan.py      # Meal plan generation
 │   │   ├── calculate_tdee.py     # TDEE calculation
-│   │   ├── update_state.py       # State persistence
-│   │   └── search_web.py         # Web search wrapper
+│   │   └── update_state.py       # State persistence
 │   └── server.py                 # Server logic
 ├── tests/                        # Test suite
 │   ├── conftest.py              # Test fixtures
@@ -251,10 +248,6 @@ uv run mypy src/
 3. **Generate Meals** → Create 7-day plan with nutritional balance
 4. **Build Grocery List** → Consolidate ingredients
 5. **Persist State** → Save to state.json
-
-### Web Search Integration
-- Uses `search_web.py` to fill gaps in nutritional data
-- Supports searching for calorie/macro information for custom foods
 
 ## License
 

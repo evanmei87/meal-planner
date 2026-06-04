@@ -6,13 +6,16 @@ mcp = FastMCP("Food & Nutrition Intelligence")
 # Import tools
 from tools.generate_plan import generate_meal_plan
 from tools.update_state import update_state
+<<<<<<< Updated upstream
 from tools.search_web import search_web_with_context
 from tools.calculate_tdee import calculate_tdee, get_user_stats
+=======
+from tools.calculate_tdee import calculate_tdee
+>>>>>>> Stashed changes
 
 # Register tools for MCP mode
 mcp.tool(name="generate_meal_plan", description="Generate a meal plan based on current state and user query.")(generate_meal_plan)
 mcp.tool(name="update_state", description="Update state.json with generated plan and grocery list.")(update_state)
-mcp.tool(name="search_web", description="Search web with @Web context wrapper for nutritional data.")(search_web_with_context)
 
 STATE_PATH = str(Path(__file__).parent / "state" / "state.json")
 DATA_DIR = Path(__file__).parent / "data"

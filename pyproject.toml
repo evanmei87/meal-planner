@@ -3,7 +3,11 @@ name = "meal-planner"
 version = "0.1.0"
 description = "AI-driven meal planning assistant with MCP integration"
 readme = "README.md"
+<<<<<<< Updated upstream
 requires-python = ">=3.10"
+=======
+requires-python = ">=3.12"
+>>>>>>> Stashed changes
 dependencies = [
     "fastmcp>=1.0.0",
     "pytest>=8.0.0",

@@ -117,7 +117,7 @@ def parse_user_updates(query: str) -> dict:
     if extra_match:
         updates['extra_items'].append(extra_match.group(1).lower())
 
-    removed_match = re.search(r'remove|skip|delete\s+(\w+)', query, re.IGNORECASE)
+    removed_match = re.search(r'(?:remove|skip|delete)\s+(\w+)', query, re.IGNORECASE)
     if removed_match:
         updates['removed_items'].append(removed_match.group(1).lower())
 

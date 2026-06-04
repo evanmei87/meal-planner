@@ -40,15 +40,17 @@ def load_recipes(recipes_content: str) -> list:
     
     # Skip first 4 lines (header comments)
     for line in lines[4:]:
-        if line.strip() and not line.strip().startswith('| name'):
+        if line.strip().startswith('|:---:') or line.strip().startswith('| name'):
+            continue
+        if line.strip():
             parts = line.split('|')
-            if len(parts) == 8:
+            if len(parts) == 9:
                 meal = {
                     'name': parts[1].strip(),
                     'version': parts[2].strip(),
                     'category': parts[3].strip(),
-                    'ingredients': [ing.strip() for ing in parts[4].strip().split(', ') if ing.strip()],
-                    'macros_raw': parts[5].strip(),
+                    'macros_raw': parts[4].strip(),
+                    'ingredients': [ing.strip() for ing in parts[5].strip().split(', ') if ing.strip()],
                     'instructions': parts[6].strip(),
                     'tags': [tag.strip() for tag in parts[7].strip().split(',') if tag.strip()]
                 }
@@ -200,6 +202,7 @@ def validate_meal_params(meal_name: str, ingredients: list,
         errors.append("At least one instruction step is required.")
     
     if macros:
+        non_numeric = False
         try:
             int(macros.get('calories', 0))
             int(macros.get('protein', 0))
@@ -207,10 +210,12 @@ def validate_meal_params(meal_name: str, ingredients: list,
             int(macros.get('fat', 0))
         except (TypeError, ValueError):
             errors.append("All macro values (calories, protein, carbs, fat) must be numeric.")
-    
-        if macros.get('calories', 0) < 0 or macros.get('protein', 0) < 0 \
-           or macros.get('carbs', 0) < 0 or macros.get('fat', 0) < 0:
-            errors.append("Macro values cannot be negative.")
+            non_numeric = True
+
+        if not non_numeric:
+            if macros.get('calories', 0) < 0 or macros.get('protein', 0) < 0 \
+               or macros.get('carbs', 0) < 0 or macros.get('fat', 0) < 0:
+                errors.append("Macro values cannot be negative.")
     
     return errors
 
