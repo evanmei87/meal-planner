@@ -1,19 +1,24 @@
 import json
 import os
 import re
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from src.tools.calculate_tdee import calculate_tdee
+from tools.calculate_tdee import calculate_tdee
+
+
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def load_static_data() -> dict:
-    """Load static markdown data files."""
-    foods_md = Path(__file__).parent.parent / 'data' / 'foods.md'
-    macros_md = Path(__file__).parent.parent / 'data' / 'macros.md'
-    rules_md = Path(__file__).parent.parent / 'data' / 'rules.md'
+    """Load static data files: standardized food.csv plus specialty and rules."""
+    data_dir = Path(__file__).parent.parent / 'data'
+    food_csv = data_dir / 'food.csv'
+    specialty_md = data_dir / 'specialty-ingredients.md'
+    rules_md = data_dir / 'rules.md'
 
     return {
-        'foods': foods_md.read_text(),
-        'macros': macros_md.read_text(),
+        'food_db': food_csv.read_text(),
+        'specialty': specialty_md.read_text(),
         'rules': rules_md.read_text()
     }
 
@@ -22,14 +27,22 @@ def load_state(state_path: str) -> dict:
     """Load and return the current state from JSON file."""
     state_file = Path(state_path)
     if not state_file.exists():
-        return {
-            'current_day': 'Monday',
-            'plan_id': 'uuid-v4-placeholder',
-            'plan': [],
-            'grocery_list': [],
-            'missing_macros': []
-        }
-    return json.loads(state_file.read_text())
+        return _default_state()
+
+    try:
+        return json.loads(state_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return _default_state()
+
+
+def _default_state() -> dict:
+    return {
+        'current_day': 'Monday',
+        'plan_id': 'uuid-v4-placeholder',
+        'plan': [],
+        'grocery_list': [],
+        'missing_macros': []
+    }
 
 
 def save_state(state: dict, state_path: str) -> bool:
@@ -42,36 +55,51 @@ def save_state(state: dict, state_path: str) -> bool:
         return False
 
 
+def get_current_day_est() -> str:
+    """Return the current day name in EST/EDT timezone."""
+    est = timezone(timedelta(hours=-4))
+    now = datetime.now(est)
+    return now.strftime('%A')
+
+
+def get_days_to_generate(current_day: str) -> list[str]:
+    """Return days from current_day through Sunday."""
+    if current_day not in DAYS:
+        return DAYS
+
+    idx = DAYS.index(current_day)
+    return DAYS[idx:]
+
+
+def get_next_day(day: str) -> str:
+    """Return the day after the given day."""
+    idx = DAYS.index(day)
+    next_idx = (idx + 1) % len(DAYS)
+    return DAYS[next_idx]
+
+
 def generate_meal_plan(state_path: str, user_query: str) -> str:
     """
     Generate a meal plan based on current state and user query.
-
-    Args:
-        state_path: Path to state.json
-        user_query: User's request or updates
-
-    Returns:
-        Markdown string containing the meal plan
     """
-    # Load state and static data
     state = load_state(state_path)
     static_data = load_static_data()
-
-    # Parse user query for updates
     updates = parse_user_updates(user_query)
-
-    # Calculate TDEE from state
     tdee = calculate_tdee_from_state(state)
 
-    # Generate plan for current day
-    day_plan = generate_day_plan(tdee, state, static_data, updates)
+    current_day = get_current_day_est()
+    state['current_day'] = current_day
+    days_to_generate = get_days_to_generate(current_day)
 
-    # Update state with new plan and grocery list
-    updated_state = update_plan_in_state(state, day_plan, updates)
+    day_plans = []
+    for day_name in days_to_generate:
+        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates)
+        day_plans.append(day_plan)
+
+    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates)
     save_state(updated_state, state_path)
 
-    # Format output
-    return format_plan_markdown(day_plan, state)
+    return format_plan_markdown(day_plans, state)
 
 
 def parse_user_updates(query: str) -> dict:
@@ -82,16 +110,13 @@ def parse_user_updates(query: str) -> dict:
         'removed_items': []
     }
 
-    # Check for "ate out" or similar
     if re.search(r'ate\s*out|skipped|did not eat', query, re.IGNORECASE):
         updates['ate_out'] = True
 
-    # Check for extra items
     extra_match = re.search(r'have\s+extra\s+(\w+)', query, re.IGNORECASE)
     if extra_match:
         updates['extra_items'].append(extra_match.group(1).lower())
 
-    # Check for removed items
     removed_match = re.search(r'remove|skip|delete\s+(\w+)', query, re.IGNORECASE)
     if removed_match:
         updates['removed_items'].append(removed_match.group(1).lower())
@@ -101,127 +126,197 @@ def parse_user_updates(query: str) -> dict:
 
 def calculate_tdee_from_state(state: dict) -> float:
     """Calculate TDEE from state data."""
-    # Extract user stats from macros.md or state
-    # This is a simplified version - in production, extract from state
-    height = 175  # cm
-    weight = 70   # kg
-    age = 30      # years
+    height = 175
+    weight = 70
+    age = 30
     gender = 'male'
 
     return calculate_tdee(height, weight, age, gender)
 
 
-def generate_day_plan(tdee: float, state: dict, static_data: dict, updates: dict) -> dict:
-    """Generate meal plan for a single day."""
-    # Determine caloric target
-    is_pre_long_run = 'saturday' in state.get('current_day', '').lower()
+# Grains strictly limited to: White Rice, Quinoa, Oatmeal (per meal-plan-requirements.md)
+# Protein types: max 3 distinct large protein types per week (eggs excluded)
+#   Chosen: Chicken Thighs, Chicken Breast, Salmon
+# Vegetables: max 5 distinct types per week
+#   Chosen: Mushrooms, Spinach, Bell Peppers, Green Beans, Broccoli
+
+PROTEIN_SHAKE = {
+    'name': 'Protein Shake (2 scoops)',
+    'calories': 250,
+    'macros': {'protein': 32, 'carbs': 8, 'fat': 5},
+    'ingredients': ['Protein Powder', 'Almond Milk'],
+}
+
+BREAKFAST_OPTIONS = [
+    {'name': 'Oatmeal with Berries', 'calories': 500, 'macros': {'protein': 25, 'carbs': 70, 'fat': 12}, 'ingredients': ['Oatmeal', 'Mixed Berries', 'Milk']},
+    {'name': 'Oatmeal with Greek Yogurt', 'calories': 520, 'macros': {'protein': 30, 'carbs': 65, 'fat': 10}, 'ingredients': ['Oatmeal', 'Greek Yogurt', 'Honey']},
+    {'name': 'Oatmeal with Scrambled Eggs', 'calories': 500, 'macros': {'protein': 28, 'carbs': 60, 'fat': 16}, 'ingredients': ['Oatmeal', 'Eggs', 'Butter']},
+    {'name': 'Oatmeal and Protein Shake', 'calories': 530, 'macros': {'protein': 38, 'carbs': 65, 'fat': 10}, 'ingredients': ['Oatmeal', 'Protein Powder', 'Banana', 'Almond Milk']},
+]
+
+LUNCH_OPTIONS = [
+    {'name': 'Chicken Thigh Stir-fry with Rice', 'calories': 750, 'macros': {'protein': 48, 'carbs': 60, 'fat': 25}, 'ingredients': ['Chicken Thighs', 'White Rice', 'Mushrooms', 'Soy Sauce']},
+    {'name': 'Salmon Rice Bowl', 'calories': 720, 'macros': {'protein': 40, 'carbs': 55, 'fat': 28}, 'ingredients': ['Salmon', 'White Rice', 'Spinach', 'Soy Sauce']},
+    {'name': 'Grilled Chicken Rice Plate', 'calories': 700, 'macros': {'protein': 50, 'carbs': 60, 'fat': 20}, 'ingredients': ['Chicken Breast', 'White Rice', 'Green Beans', 'Olive Oil']},
+]
+
+DINNER_OPTIONS = [
+    {'name': 'Salmon Quinoa Bowl', 'calories': 750, 'macros': {'protein': 50, 'carbs': 40, 'fat': 28}, 'ingredients': ['Salmon', 'Quinoa', 'Broccoli', 'Olive Oil']},
+    {'name': 'Chicken Breast with Quinoa', 'calories': 730, 'macros': {'protein': 50, 'carbs': 38, 'fat': 28}, 'ingredients': ['Chicken Breast', 'Quinoa', 'Green Beans', 'Olive Oil']},
+    {'name': 'Salmon with Quinoa and Spinach', 'calories': 760, 'macros': {'protein': 45, 'carbs': 45, 'fat': 32}, 'ingredients': ['Salmon', 'Quinoa', 'Spinach', 'Olive Oil']},
+]
+
+EXTRA_SNACK_OPTIONS = [
+    {'name': 'Greek Yogurt with Nuts', 'calories': 280, 'macros': {'protein': 25, 'carbs': 15, 'fat': 12}, 'ingredients': ['Greek Yogurt', 'Mixed Nuts']},
+    {'name': 'Cottage Cheese', 'calories': 240, 'macros': {'protein': 28, 'carbs': 10, 'fat': 5}, 'ingredients': ['Cottage Cheese']},
+    {'name': 'Hard-boiled Eggs', 'calories': 280, 'macros': {'protein': 24, 'carbs': 5, 'fat': 18}, 'ingredients': ['Eggs']},
+]
+
+_CORE_SLOTS = [BREAKFAST_OPTIONS, LUNCH_OPTIONS, DINNER_OPTIONS]
+
+
+def _pick_meal(slot_options: list[dict], day_index: int) -> dict:
+    """Pick a meal from slot_options cycling by day_index so each day varies."""
+    return slot_options[day_index % len(slot_options)]
+
+
+def generate_day_plan(tdee: float, day_name: str, state: dict, static_data: dict, updates: dict) -> dict:
+    """Generate meal plan for a single day, compliant with meal-plan-requirements.md."""
+    is_pre_long_run = 'friday' in day_name.lower()
     target_calories = 2700 if is_pre_long_run else 2250
 
-    # Generate meals
+    day_index = DAYS.index(day_name)
+
+    # Core meals: breakfast, lunch, dinner
     meals = []
-    # Breakfast
-    meals.append({
-        'name': 'Oatmeal with berries',
-        'calories': 300,
-        'macros': {'protein': 10, 'carbs': 50, 'fat': 5}
-    })
-    # Lunch
-    meals.append({
-        'name': 'Chicken Thigh Stir-fry with Rice',
-        'calories': 600,
-        'macros': {'protein': 35, 'carbs': 45, 'fat': 20}
-    })
-    # Dinner
-    meals.append({
-        'name': 'Salmon with Quinoa and Vegetables',
-        'calories': 700,
-        'macros': {'protein': 30, 'carbs': 30, 'fat': 35}
-    })
-    # Snack
-    meals.append({
-        'name': 'Greek Yogurt with nuts',
-        'calories': 200,
-        'macros': {'protein': 20, 'carbs': 10, 'fat': 5}
-    })
+    for slot in _CORE_SLOTS:
+        meal = _pick_meal(slot, day_index)
+        meals.append(meal)
 
-    # Calculate total calories
+    # Always include protein shake for minimum 2 scoops per day
+    meals.append(PROTEIN_SHAKE)
+
+    # Add extra snack if calories permit
+    core_with_shake = sum(m['calories'] for m in meals)
+    extra = _pick_meal(EXTRA_SNACK_OPTIONS, day_index)
+    if core_with_shake + extra['calories'] <= target_calories:
+        meals.append(extra)
+
     total_calories = sum(m['calories'] for m in meals)
-
-    # Adjust if needed
-    if total_calories > target_calories:
-        # Remove or reduce a meal
-        meals.pop()  # Remove snack
+    total_protein = sum(m['macros']['protein'] for m in meals)
+    total_carbs = sum(m['macros']['carbs'] for m in meals)
 
     return {
-        'day': state.get('current_day', 'Monday'),
+        'day': day_name,
         'meals': meals,
-        'total_calories': total_calories
+        'total_calories': total_calories,
+        'total_protein': total_protein,
+        'total_carbs': total_carbs
     }
 
 
-def update_plan_in_state(state: dict, day_plan: dict, updates: dict) -> dict:
-    """Update state with new plan and grocery list."""
-    # Add day to plan
-    state['plan'].append(day_plan)
+# Per-serving quantities. Merge logic sums across days for correct weekly totals.
+_INGREDIENT_MAP = {
+    'Oatmeal': {'item': 'Oatmeal', 'quantity': 1, 'unit': 'cups', 'category': 'Grain'},
+    'Mixed Berries': {'item': 'Mixed Berries', 'quantity': 0.5, 'unit': 'lbs', 'category': 'Fruit'},
+    'Milk': {'item': 'Milk', 'quantity': 0.5, 'unit': 'cups', 'category': 'Dairy'},
+    'Greek Yogurt': {'item': 'Greek Yogurt', 'quantity': 0.75, 'unit': 'cups', 'category': 'Dairy'},
+    'Honey': {'item': 'Honey', 'quantity': 0.5, 'unit': 'oz', 'category': 'Pantry'},
+    'Butter': {'item': 'Butter', 'quantity': 0.5, 'unit': 'tbsp', 'category': 'Dairy'},
+    'Protein Powder': {'item': 'Protein Powder', 'quantity': 2, 'unit': 'scoops', 'category': 'Pantry'},
+    'Almond Milk': {'item': 'Almond Milk', 'quantity': 0.5, 'unit': 'cups', 'category': 'Dairy'},
+    'White Rice': {'item': 'White Rice', 'quantity': 1, 'unit': 'cups', 'category': 'Grain'},
+    'Quinoa': {'item': 'Quinoa', 'quantity': 0.75, 'unit': 'cups', 'category': 'Grain'},
+    'Soy Sauce': {'item': 'Soy Sauce', 'quantity': 1, 'unit': 'tbsp', 'category': 'Pantry'},
+    'Olive Oil': {'item': 'Olive Oil', 'quantity': 1, 'unit': 'tbsp', 'category': 'Pantry'},
+    'Mixed Nuts': {'item': 'Mixed Nuts', 'quantity': 0.25, 'unit': 'cups', 'category': 'Pantry'},
+    'Cottage Cheese': {'item': 'Cottage Cheese', 'quantity': 0.5, 'unit': 'cups', 'category': 'Dairy'},
+    # Protein (Chicken Thighs and Chicken Breast are distinct types per requirements)
+    'Chicken Thighs': {'item': 'Chicken Thighs', 'quantity': 0.5, 'unit': 'lbs', 'category': 'Protein'},
+    'Chicken Breast': {'item': 'Chicken Breast', 'quantity': 0.5, 'unit': 'lbs', 'category': 'Protein'},
+    'Salmon': {'item': 'Salmon', 'quantity': 0.5, 'unit': 'lbs', 'category': 'Protein'},
+    'Eggs': {'item': 'Eggs', 'quantity': 2, 'unit': 'count', 'category': 'Protein'},
+    # Vegetables (fresh only, no frozen)
+    'Mushrooms': {'item': 'Mushrooms', 'quantity': 1, 'unit': 'cups', 'category': 'Vegetable'},
+    'Spinach': {'item': 'Spinach', 'quantity': 2, 'unit': 'cups', 'category': 'Vegetable'},
+    'Bell Peppers': {'item': 'Bell Peppers', 'quantity': 1, 'unit': 'count', 'category': 'Vegetable'},
+    'Green Beans': {'item': 'Green Beans', 'quantity': 1, 'unit': 'cups', 'category': 'Vegetable'},
+    'Broccoli': {'item': 'Broccoli', 'quantity': 1, 'unit': 'cups', 'category': 'Vegetable'},
+    # Fruit
+    'Banana': {'item': 'Bananas', 'quantity': 1, 'unit': 'count', 'category': 'Fruit'},
+}
 
-    # Generate grocery list from meals
+
+def update_plan_in_state(state: dict, day_plans: list[dict], days_generated: list[str], updates: dict) -> dict:
+    """Update state with new plan and consolidated grocery list."""
+    state['plan'] = day_plans
+
     grocery_items = []
-    for meal in day_plan['meals']:
-        item_name = meal['name']
-        # Extract main ingredient
-        if 'Chicken' in item_name:
-            grocery_items.append({'item': 'Chicken Thighs', 'quantity': 1.5, 'unit': 'lbs', 'category': 'Protein'})
-        elif 'Salmon' in item_name:
-            grocery_items.append({'item': 'Salmon', 'quantity': 1, 'unit': 'lbs', 'category': 'Protein'})
-        elif 'Oatmeal' in item_name:
-            grocery_items.append({'item': 'Oatmeal', 'quantity': 2, 'unit': 'cups', 'category': 'Grain'})
-        elif 'Quinoa' in item_name:
-            grocery_items.append({'item': 'Quinoa', 'quantity': 1.5, 'unit': 'cups', 'category': 'Grain'})
-        elif 'Rice' in item_name:
-            grocery_items.append({'item': 'White Rice', 'quantity': 2, 'unit': 'cups', 'category': 'Grain'})
-        elif 'Greek Yogurt' in item_name:
-            grocery_items.append({'item': 'Greek Yogurt', 'quantity': 2, 'unit': 'cups', 'category': 'Dairy'})
+    for day_plan in day_plans:
+        for meal in day_plan['meals']:
+            for ingredient in meal.get('ingredients', []):
+                mapped = _INGREDIENT_MAP.get(ingredient)
+                if mapped:
+                    grocery_items.append(mapped)
 
-    # Remove duplicates
-    seen = set()
-    unique_items = []
+    merged: dict[str, dict] = {}
     for item in grocery_items:
-        key = (item['item'], item['category'])
-        if key not in seen:
-            seen.add(key)
-            unique_items.append(item)
+        key = item['item']
+        if key in merged:
+            merged[key]['quantity'] += item['quantity']
+        else:
+            merged[key] = dict(item)
 
-    state['grocery_list'] = unique_items
+    state['grocery_list'] = list(merged.values())
 
-    # Handle updates
     if updates['ate_out']:
         state['plan'][-1]['meals'] = []
 
     return state
 
 
-def format_plan_markdown(day_plan: dict, state: dict) -> str:
+_CATEGORY_ORDER = ['Dairy', 'Protein', 'Grain', 'Vegetable', 'Fruit', 'Pantry']
+
+
+def format_plan_markdown(day_plans: list[dict], state: dict) -> str:
     """Format plan as Markdown code block."""
-    lines = []
-    lines.append(f"```\n"
-                 f"## {day_plan['day']} Meal Plan\n"
-                 f"\n"
-                 f"### Meals\n"
-                 f"\n"
-                 f"| Meal | Calories | Protein | Carbs | Fat |\n"
-                 f"|-----|---------|--------|-------|-----|\n")
+    lines = ["```"]
 
-    for meal in day_plan['meals']:
-        macros = meal.get('macros', {})
-        lines.append(f"| {meal['name']} | {meal['calories']} | {macros.get('protein', 0)}g | {macros.get('carbs', 0)}g | {macros.get('fat', 0)}g |")
+    for day_plan in day_plans:
+        lines.append(f"## {day_plan['day']} Meal Plan\n")
+        lines.append("### Meals\n")
+        lines.append("| Meal | Calories | Protein | Carbs | Fat |")
+        lines.append("|-----|---------|--------|-------|-----|")
 
-    lines.append(f"\n### Total Calories: {day_plan['total_calories']}\n"
-                 f"\n"
-                 f"### Grocery List\n")
+        for meal in day_plan['meals']:
+            macros = meal.get('macros', {})
+            lines.append(f"| {meal['name']} | {meal['calories']} | {macros.get('protein', 0)}g | {macros.get('carbs', 0)}g | {macros.get('fat', 0)}g |")
 
+        lines.append(f"\n### Total Calories: {day_plan['total_calories']}  |  Total Protein: {day_plan['total_protein']}g  |  Total Carbs: {day_plan['total_carbs']}g")
+
+    # Group grocery list by category
+    grouped: dict[str, list[dict]] = {}
     for item in state['grocery_list']:
-        lines.append(f"- {item['item']}: {item['quantity']} {item['unit']}")
+        cat = item.get('category', 'Other')
+        grouped.setdefault(cat, []).append(item)
 
-    lines.append(f"\n```")
+    lines.append("\n### Grocery List\n")
+
+    for cat in _CATEGORY_ORDER:
+        items = grouped.pop(cat, None)
+        if not items:
+            continue
+        lines.append(f"**{cat}**")
+        for item in items:
+            lines.append(f"- {item['item']}: {item['quantity']} {item['unit']}")
+        lines.append("")
+
+    for cat, items in grouped.items():
+        lines.append(f"**{cat}**")
+        for item in items:
+            lines.append(f"- {item['item']}: {item['quantity']} {item['unit']}")
+        lines.append("")
+
+    lines.append("```")
 
     return '\n'.join(lines)

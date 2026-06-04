@@ -4,9 +4,10 @@
 - **Daily Hard Cap:** 2250 kcal/day (strict maximum)
 - **Pre-Long Run Exception:** 2500-2700 kcal allowed only on the day immediately preceding the "Long Run" (Saturday)
 - **TDEE Calculation:** Use Mifflin-St. Jeor formula as baseline
+- 120-180 grams of protein per day
 
 ## Protein Limits
-- Maximum 3 distinct large protein types per week
+- Maximum 3 distinct protein types per week. Chicken thighs and chicken breast are distinct
 - Examples: Chicken Thighs, Ground Beef, Tofu (Eggs excluded from count)
 - Do not exceed protein diversity beyond the limit
 

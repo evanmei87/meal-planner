@@ -5,7 +5,6 @@ An AI-driven meal planning assistant integrated with a local MCP server that gen
 ## Features
 
 - **User Feature A**: Generate 7-day meal plans aligned with user preferences and nutritional goals
-- **User Feature B**: Apply user-provided updates (dietary changes, new foods, meal swaps) to create updated meal plans and regenerate grocery lists
 - Track nutritional macros and caloric intake
 - Manage grocery lists automatically
 - Handle state persistence across sessions
@@ -52,30 +51,6 @@ uv run src/server.py
    - View nutritional summaries
    - Export meal plans or grocery lists
 
-### Feature B: Apply Updates and Regenerate
-
-Make changes to your preferences, then request an update:
-
-1. Update your preferences:
-```bash
-# Edit food preferences
-nano src/data/foods.md
-
-# Add nutritional data
-nano src/data/macros.md
-
-# Add or modify constraints
-nano src/data/rules.md
-```
-
-2. Request an update:
-```bash
-# Type this in the server prompt
-update_plan
-```
-
-3. Review the updated meal plan and new grocery list generated from your changes.
-
 ## Usage Examples
 
 ### Viewing Your Current Profile
@@ -89,12 +64,6 @@ Displays your nutritional goals, TDEE, and current preferences.
 >>> generate_plan
 ```
 Creates a fresh 7-day meal plan based on current preferences.
-
-### Applying User Updates
-```
->>> update_plan
-```
-Regenerates the meal plan with any changes made to your preference files.
 
 ### Viewing Grocery List
 ```

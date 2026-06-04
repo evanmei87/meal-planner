@@ -6,15 +6,15 @@ from pathlib import Path
 
 
 def load_static_data() -> dict:
-    """Load static markdown data files."""
+    """Load static data files: standardized food.csv plus specialty and recipes."""
     data_dir = Path(__file__).parent.parent / 'data'
-    foods_md = data_dir / 'foods.md'
-    macros_md = data_dir / 'macros.md'
+    food_csv = data_dir / 'food.csv'
+    specialty_md = data_dir / 'specialty-ingredients.md'
     recipes_md = data_dir / 'meal-recipes.md'
-    
+
     return {
-        'foods': foods_md.read_text(),
-        'macros': macros_md.read_text(),
+        'food_db': food_csv.read_text(),
+        'specialty': specialty_md.read_text(),
         'recipes': recipes_md.read_text()
     }
 
@@ -73,87 +73,57 @@ def load_recipes(recipes_content: str) -> list:
     return meals
 
 
-_FOODS_CACHE = None
-_MACROS_CACHE = None
+_SPECIALTY_CACHE = None
 
 
-def _build_foods_set(foods_content: str) -> set:
-    """Build a set of food names for O(1) lookups."""
-    foods = set()
-    for line in foods_content.split('\n'):
-        if line.strip().startswith('|') and 'Food' not in line:
-            food = line.split('|')[1].strip().lower()
-            if food:
-                foods.add(food)
-    return foods
-
-
-def _build_macros_dict(macros_content: str) -> dict:
-    """Build a dict of food -> macros for O(1) lookups."""
-    macros_dict = {}
-    for line in macros_content.split('\n'):
-        if line.strip().startswith('|') and 'Food' not in line:
-            parts = line.split('|')
-            if len(parts) >= 5:
-                food = parts[1].strip().lower()
-                if food:
-                    try:
-                        macros_dict[food] = {
-                            'portion': parts[2].strip(),
-                            'calories': int(parts[3].strip()),
-                            'protein': int(parts[4].strip()),
-                            'carbs': int(parts[5].strip()),
-                            'fat': int(parts[6].strip())
-                        }
-                    except (ValueError, IndexError):
-                        macros_dict[food] = {'portion': '', 'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-    return macros_dict
+def _build_specialty_dict(specialty_content: str) -> dict:
+    """Parse specialty-ingredients.md into a dict of ingredient_name -> macros."""
+    parsed: dict[str, dict] = {}
+    for line in specialty_content.split('\n'):
+        if not line.strip().startswith('|'):
+            continue
+        if 'Ingredient' in line or 'Portion' in line:
+            continue
+        parts = [p.strip() for p in line.split('|') if p.strip()]
+        if len(parts) < 6:
+            continue
+        name = parts[0].lower()
+        if not name:
+            continue
+        try:
+            parsed[name] = {
+                'portion': parts[1],
+                'calories': int(parts[2]),
+                'protein': int(parts[3].rstrip('g')),
+                'carbs': int(parts[4].rstrip('g')),
+                'fat': int(parts[5].rstrip('g')),
+            }
+        except (ValueError, IndexError):
+            parsed[name] = {'portion': parts[1] if len(parts) > 1 else '',
+                            'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
+    return parsed
 
 
 def invalidate_caches():
-    """Invalidate cached food and macro data (call after adding new foods)."""
-    global _FOODS_CACHE, _MACROS_CACHE
-    _FOODS_CACHE = None
-    _MACROS_CACHE = None
+    """Invalidate cached specialty-ingredient data (call after adding new foods)."""
+    global _SPECIALTY_CACHE
+    _SPECIALTY_CACHE = None
 
 
-def food_exists(food_name: str, foods_content: str) -> bool:
-    """Check if food exists in foods.md (case-insensitive, cached)."""
-    global _FOODS_CACHE
-    if _FOODS_CACHE is None:
-        _FOODS_CACHE = _build_foods_set(foods_content)
-    return food_name.lower().strip() in _FOODS_CACHE
+def food_exists(food_name: str, specialty_content: str) -> bool:
+    """Check if food exists in specialty-ingredients.md (case-insensitive, cached)."""
+    global _SPECIALTY_CACHE
+    if _SPECIALTY_CACHE is None:
+        _SPECIALTY_CACHE = _build_specialty_dict(specialty_content)
+    return food_name.lower().strip() in _SPECIALTY_CACHE
 
 
-def get_food_macros(food_name: str, macros_content: str) -> dict:
-    """Get macros for a food from macros.md (cached)."""
-    global _MACROS_CACHE
-    if _MACROS_CACHE is None:
-        _MACROS_CACHE = _build_macros_dict(macros_content)
-    return _MACROS_CACHE.get(food_name.lower().strip())
-
-
-def prompt_for_food_properties(food_name: str, foods_content: str, prompt_session) -> dict:
-    """Prompt user for new food properties with validation."""
-    print(f"\nNew food detected: {food_name}")
-    print("This food will be added to your food database.")
-    print("\n--- Food Properties ---")
-    
-    while True:
-        category = input(f"Category (Protein/Grain/Vegetable/etc.): ").strip()
-        if category:
-            break
-        print("Category is required. Please enter a valid food category.")
-    
-    preparation = input(f"Preparation method: ").strip() or "Standard"
-    notes = input(f"Notes: ").strip() or ""
-    
-    return {
-        'food_name': food_name,
-        'category': category,
-        'preparation': preparation,
-        'notes': notes
-    }
+def get_food_macros(food_name: str, specialty_content: str) -> dict:
+    """Get macros for a food from specialty-ingredients.md (cached)."""
+    global _SPECIALTY_CACHE
+    if _SPECIALTY_CACHE is None:
+        _SPECIALTY_CACHE = _build_specialty_dict(specialty_content)
+    return _SPECIALTY_CACHE.get(food_name.lower().strip())
 
 
 def prompt_for_macros(prompt_session) -> dict:
@@ -194,45 +164,25 @@ def prompt_for_macros(prompt_session) -> dict:
         print("Invalid format. Use: portion|calories|protein|carbs|fat  (e.g., 1 cup|200|20|30|10)")
 
 
-def add_new_food(food_name: str, foods_content: str, macros_content: str, 
-                 food_props: dict, macros_data: dict) -> tuple:
-    """Add new food to foods.md and macros.md."""
-    foods_path = Path(__file__).parent.parent / 'data' / 'foods.md'
-    macros_path = Path(__file__).parent.parent / 'data' / 'macros.md'
-    
-    # Build the new food row: food_name | category | preparation | notes
-    food_row = food_props.get('food_name', food_name)
-    food_row += " | " + food_props.get('category', 'Other')
-    food_row += " | " + food_props.get('preparation', 'Standard')
-    food_row += " | " + food_props.get('notes', '')
-    
-    # Find the last table row in foods.md to insert after it
-    lines = foods_content.split('\n')
-    last_table_idx = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith('|') and 'Food' not in line:
-            last_table_idx = i
-    # Insert after the last table row (or after line 2 if no rows exist)
-    insert_at = (last_table_idx + 1) if last_table_idx is not None else 3
-    lines.insert(insert_at, "| " + food_row + " |")
-    
-    # Build and append new macros row
-    macros_row = food_props.get('food_name', food_name)
-    macros_row += " | " + macros_data.get('portion', '')
-    macros_row += " | " + str(macros_data.get('calories', 0))
-    macros_row += " | " + str(macros_data.get('protein', 0)) + "g"
-    macros_row += " | " + str(macros_data.get('carbs', 0)) + "g"
-    macros_row += " | " + str(macros_data.get('fat', 0)) + "g"
-    
-    # Append to the end of macros content
-    macros_lines = macros_content.split('\n')
-    macros_lines.append("| " + macros_row + " |")
-    
-    # Write both files
-    foods_path.write_text('\n'.join(lines))
-    macros_path.write_text('\n'.join(macros_lines))
-    
-    return True, food_props.get('food_name', food_name)
+def add_new_food(food_name: str, specialty_content: str, macros_data: dict) -> tuple:
+    """Append a new ingredient row to specialty-ingredients.md."""
+    specialty_path = Path(__file__).parent.parent / 'data' / 'specialty-ingredients.md'
+
+    row = f"| {food_name}"
+    row += " | " + macros_data.get('portion', '')
+    row += " | " + str(macros_data.get('calories', 0))
+    row += " | " + str(macros_data.get('protein', 0)) + "g"
+    row += " | " + str(macros_data.get('carbs', 0)) + "g"
+    row += " | " + str(macros_data.get('fat', 0)) + "g"
+    row += " |"
+
+    new_lines = specialty_content.split('\n')
+    if new_lines and new_lines[-1].strip() != '':
+        new_lines.append('')
+    new_lines.append(row)
+
+    specialty_path.write_text('\n'.join(new_lines))
+    return True, food_name
 
 
 def validate_meal_params(meal_name: str, ingredients: list,
@@ -314,51 +264,41 @@ def add_saved_meal(meal_name: str, ingredients: list,
             'message': f"Permission denied reading data file: {e}"
         }
     
-    foods_content = static_data['foods']
-    macros_content = static_data['macros']
+    specialty_content = static_data['specialty']
     recipes_content = static_data['recipes']
-    
+
     newly_added = []
-    
+
     # Process each ingredient
     for ingredient in ingredients:
         ingredient_clean = ingredient.strip()
         if not ingredient_clean:
             continue
-        
-        # Check if food exists
-        if not food_exists(ingredient_clean, foods_content):
+
+        # Check if food exists in specialty-ingredients.md
+        if not food_exists(ingredient_clean, specialty_content):
             if prompt_session:
-                print(f"\nIngredient '{ingredient_clean}' not found in food database.")
-                food_props = prompt_for_food_properties(ingredient_clean, foods_content, prompt_session)
+                print(f"\nIngredient '{ingredient_clean}' not found in specialty ingredients.")
                 macros_data = prompt_for_macros(prompt_session)
-                
-                # Add the new food to both foods.md and macros.md
-                success, food_name = add_new_food(ingredient_clean, foods_content, macros_content, food_props, macros_data)
+
+                # Add the new ingredient to specialty-ingredients.md
+                success, food_name = add_new_food(ingredient_clean, specialty_content, macros_data)
                 if success:
-                    print(f"Added '{food_name}' to food database.")
+                    print(f"Added '{food_name}' to specialty ingredients.")
                     # Invalidate caches and reload content so subsequent lookups see the new food
                     invalidate_caches()
                     static_data = load_static_data()
-                    foods_content = static_data['foods']
-                    macros_content = static_data['macros']
+                    specialty_content = static_data['specialty']
                 else:
-                    print(f"Warning: Failed to add '{ingredient_clean}' to food database.")
-                
+                    print(f"Warning: Failed to add '{ingredient_clean}' to specialty ingredients.")
+
                 newly_added.append(ingredient_clean)
             else:
                 # Auto-add without prompting
-                macros_data = {
-                    'portion': '',
-                    'calories': macros.get('calories', 0),
-                    'protein': macros.get('protein', 0),
-                    'carbs': macros.get('carbs', 0),
-                    'fat': macros.get('fat', 0)
-                }
                 newly_added.append(ingredient_clean)
         else:
             # Get existing macros if food exists
-            existing_macros = get_food_macros(ingredient_clean, macros_content)
+            existing_macros = get_food_macros(ingredient_clean, specialty_content)
             if existing_macros and all(existing_macros.values()):
                 macros = existing_macros
             else:
