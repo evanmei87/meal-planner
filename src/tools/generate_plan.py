@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from tools.calculate_tdee import calculate_tdee
+from tools.calculate_tdee import calculate_tdee, get_user_stats
 
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -126,12 +126,8 @@ def parse_user_updates(query: str) -> dict:
 
 def calculate_tdee_from_state(state: dict) -> float:
     """Calculate TDEE from state data."""
-    height = 175
-    weight = 70
-    age = 30
-    gender = 'male'
-
-    return calculate_tdee(height, weight, age, gender)
+    stats = get_user_stats()
+    return calculate_tdee(stats['height_cm'], stats['weight_kg'], stats['age'], stats['gender'])
 
 
 # Grains strictly limited to: White Rice, Quinoa, Oatmeal (per meal-plan-requirements.md)
@@ -280,7 +276,7 @@ _CATEGORY_ORDER = ['Dairy', 'Protein', 'Grain', 'Vegetable', 'Fruit', 'Pantry']
 
 def format_plan_markdown(day_plans: list[dict], state: dict) -> str:
     """Format plan as Markdown code block."""
-    lines = ["```"]
+    lines = ["```markdown"]
 
     for day_plan in day_plans:
         lines.append(f"## {day_plan['day']} Meal Plan\n")

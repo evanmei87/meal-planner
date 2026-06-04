@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from pathlib import Path
 import json
 import sys
@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tools.update_state import update_state
-from tools.generate_plan import load_state, save_state
+from tools.generate_plan import generate_meal_plan, load_state, save_state
 
 class TestStatePersistence:
     """Tests to ensure state.json is updated correctly after generation."""

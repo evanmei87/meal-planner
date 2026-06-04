@@ -7,7 +7,7 @@ mcp = FastMCP("Food & Nutrition Intelligence")
 from tools.generate_plan import generate_meal_plan
 from tools.update_state import update_state
 from tools.search_web import search_web_with_context
-from tools.calculate_tdee import calculate_tdee
+from tools.calculate_tdee import calculate_tdee, get_user_stats
 
 # Register tools for MCP mode
 mcp.tool(name="generate_meal_plan", description="Generate a meal plan based on current state and user query.")(generate_meal_plan)
@@ -22,13 +22,19 @@ def load_profile_text() -> str:
     """Load and format user profile from data files."""
     specialty = (DATA_DIR / "specialty-ingredients.md").read_text()
 
-    tdee = calculate_tdee(height_cm=175, weight_kg=70, age=30, gender="male")
+    stats = get_user_stats()
+    tdee = calculate_tdee(
+        height_cm=stats['height_cm'],
+        weight_kg=stats['weight_kg'],
+        age=stats['age'],
+        gender=stats['gender']
+    )
 
     lines = [
         "## User Profile",
         "",
         f"**TDEE**: {tdee} kcal/day (estimated)",
-        "**Stats**: 175cm, 70kg, 30yo, male",
+        f"**Stats**: {stats['height_cm']}cm, {stats['weight_kg']}kg, {stats['age']}yo, {stats['gender']}",
         "",
         "### Macro Goals",
         "| Target | Value |",

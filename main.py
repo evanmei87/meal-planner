@@ -11,7 +11,7 @@ from tools.update_state import update_state
 
 def add_saved_meal_cli(args):
     """CLI handler for adding saved meals."""
-    from src.tools.add_saved_meal import add_saved_meal
+    from tools.add_saved_meal import add_saved_meal
     
     # Parse ingredients
     ingredients = [ing.strip() for ing in args.ingredients.split(',')]
@@ -52,7 +52,7 @@ def add_saved_meal_cli(args):
 
 def list_meals_cli(args):
     """CLI handler for listing/searching meals."""
-    from src.tools.load_saved_meals import load_saved_meals
+    from tools.load_saved_meals import load_saved_meals
     
     meals = load_saved_meals(filter_category=args.category, search_term=args.search)
     
@@ -81,7 +81,7 @@ def list_meals_cli(args):
 
 def search_meals_cli(args):
     """CLI handler for advanced meal search."""
-    from src.tools.search_meals import search_meals
+    from tools.search_meals import search_meals
     
     criteria = {}
     

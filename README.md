@@ -40,10 +40,12 @@ uv pip install -r requirements.txt
 uv run src/server.py
 ```
 
-2. The server will initialize with your preferences from `src/data/`:
-   - `foods.md` - Your food preferences and dietary restrictions
-   - `macros.md` - Nutritional data and macro goals
+2. The server will initialize with your preferences and metrics from `src/data/`:
+   - `food.csv` - Standardized food database
+   - `specialty-ingredients.md` - Specialty food items and macros
    - `rules.md` - Hard constraints (allergies, dislikes)
+   - `meal-recipes.md` - Reusable meal recipes
+   - `user_stats.csv` - (Optional) Personal metrics (height, weight, age, gender) to calculate custom TDEE. Falls back to defaults (175cm, 70kg, 30yo, male) if not present.
 
 3. Interact with the terminal prompt to:
    - Review your profile
@@ -90,7 +92,7 @@ uv run main.py add \
 ```
 
 - `--name` — Name of the meal (re-adding the same name updates the timestamp)
-- `--ingredients` — Comma-separated list (must exist in `foods.md`)
+- `--ingredients` — Comma-separated list (must exist in `food.csv` or `specialty-ingredients.md`)
 - `--macros` — Pipe-delimited: `calories|protein|carbs|fat`
 - `--instructions` — Semicolon-separated steps
 - `--category` — Meal category (default: `Dinner`)
@@ -140,20 +142,19 @@ Supported search filters: `--category`, `--search`, `--min-cal`, `--max-cal`, `-
 
 ### Automatic Food Discovery
 
-When adding a meal with an ingredient not yet in `foods.md`, the tool prompts for:
+When adding a meal with an ingredient not yet in `specialty-ingredients.md` or `food.csv`, the tool prompts for:
 
-1. **Food properties** — Category, preparation method, notes
-2. **Macro data** — Portion size, calories, protein, carbs, fat
+1. **Macro data** — Portion size, calories, protein, carbs, fat
 
-The new ingredient is appended to both `foods.md` and `macros.md`, so subsequent meals can reference it without re-entry.
+The new ingredient is appended to `specialty-ingredients.md`, so subsequent meals can reference it without re-entry.
 
 Example flow:
 
 ```bash
-# First time using "Quinoa" — not yet in foods.md
+# First time using "Quinoa" — not yet in specialty-ingredients.md
 uv run main.py add --name "Quinoa Bowl" --ingredients "Quinoa, Spinach" --macros "300|12|50|8" --instructions "Cook quinoa;Add spinach" --category Lunch
 
-# The tool will prompt for Quinoa's food properties and macros,
+# The tool will prompt for Quinoa's macros,
 # then save both the new food and the meal.
 ```
 
@@ -169,9 +170,11 @@ meal-planner/
 ├── main.py                        # Entry point script
 ├── src/
 │   ├── data/                     # User preference data
-│   │   ├── foods.md              # Preferred and disliked foods
-│   │   ├── macros.md             # Nutritional macros and goals
-│   │   └── rules.md              # Hard constraints and allergies
+│   │   ├── food.csv              # Standardized food database
+│   │   ├── specialty-ingredients.md # Specialty food items and macros
+│   │   ├── meal-recipes.md       # Reusable meal recipes
+│   │   ├── rules.md              # Hard constraints and allergies
+│   │   └── user_stats.csv        # (Optional) Personal stats/metrics (ignored)
 │   ├── state/                    # Session state management
 │   │   └── state.json            # Dynamic session data
 │   ├── tools/                    # Core logic modules
@@ -195,19 +198,39 @@ meal-planner/
 
 Edit the following files to customize your meal planner:
 
-- **`src/data/foods.md`** - Add/remove food preferences and dietary habits
-- **`src/data/macros.md`** - Update nutritional data and macro goals
+- **`src/data/food.csv`** - Standardized food database
+- **`src/data/specialty-ingredients.md`** - Update specialty nutritional data
 - **`src/data/rules.md`** - Modify constraints (allergies, food dislikes)
+- **`src/data/user_stats.csv`** - (Optional) Custom physical stats/metrics (create to set personal metrics)
 - **`src/state/state.json`** - Session state (modified automatically)
 
 ## Development
 
-Use `uv run` to execute development tools within your isolated environment:
+### Running Unit Tests
+
+You can run the unit tests in the `tests/` folder using `pytest`:
+
+**Option 1: Using `uv` (Recommended)**
+```bash
+uv run pytest tests/
+```
+
+**Option 2: Using the virtual environment directly**
+```bash
+# Activate the virtual environment (Windows)
+.venv\Scripts\activate
+pytest tests/
+
+# Activate the virtual environment (macOS/Linux)
+source .venv/bin/activate
+pytest tests/
+```
+
+### Other Development Commands
+
+Use `uv run` to execute other development tools:
 
 ```bash
-# Run tests
-uv run pytest tests/
-
 # Format code
 uv run black src/
 

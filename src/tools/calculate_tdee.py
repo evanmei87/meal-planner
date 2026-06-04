@@ -1,5 +1,33 @@
 import json
 import os
+from pathlib import Path
+import csv
+
+
+def get_user_stats() -> dict:
+    """Load user stats from user_stats.csv if it exists, otherwise return defaults."""
+    default_stats = {
+        'height_cm': 175.0,
+        'weight_kg': 70.0,
+        'age': 30,
+        'gender': 'male'
+    }
+    csv_path = Path(__file__).parent.parent / 'data' / 'user_stats.csv'
+    if not csv_path.exists():
+        return default_stats
+
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            row = next(reader)
+            return {
+                'height_cm': float(row.get('height_cm', default_stats['height_cm'])),
+                'weight_kg': float(row.get('weight_kg', default_stats['weight_kg'])),
+                'age': int(row.get('age', default_stats['age'])),
+                'gender': row.get('gender', default_stats['gender']).strip().lower()
+            }
+    except Exception:
+        return default_stats
 
 
 def calculate_tdee(height_cm: float, weight_kg: float, age: int, gender: str, activity_factor: float = 1.55) -> float:

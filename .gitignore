@@ -29,3 +29,4 @@ Thumbs.db
 # --- Project-Specific Runtime State ---
 # This prevents your personal history/session state from causing Git conflicts
 src/state/state.json
+src/data/user_stats.csv
