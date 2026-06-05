@@ -21,17 +21,24 @@ def load_static_data() -> dict:
 
 
 def load_saved_meals(filter_category: str = None, 
-                     search_term: str = None) -> list:
+                     search_term: str = None,
+                     filter_params: dict = None) -> list:
     """
     Load saved meals from the recipes database.
     
     Args:
         filter_category: Filter meals by category (Breakfast/Lunch/Dinner/etc.)
         search_term: Search term to filter meals by name or ingredients
+        filter_params: Dictionary with filter parameters for API use (optional)
     
     Returns:
         List of meal dictionaries with metadata
     """
+    # Use filter_params if provided (for API compatibility)
+    if filter_params:
+        filter_category = filter_params.get('category')
+        search_term = filter_params.get('search_term')
+    
     static_data = load_static_data()
     recipes_content = static_data['recipes']
     meals = []

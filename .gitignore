@@ -26,6 +26,10 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# --- Security & State ---
+.env
+state.json
+
 # --- Project-Specific Runtime State ---
 # This prevents your personal history/session state from causing Git conflicts
 src/state/state.json

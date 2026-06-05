@@ -29,6 +29,17 @@ uv pip install -r requirements.txt
 # Note: If your pyproject.toml is fully configured for uv, you can alternatively just run `uv sync`
 ```
 
+### API Key Setup (for API usage)
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env to set your API key
+# For development, you can use: dev-key-change-in-production
+# For production, use a strong randomly generated key
+```
+
 ## Quick Start
 
 ### Feature A: Generate Initial 7-Day Meal Plan
@@ -190,6 +201,19 @@ meal-planner/
     ├── tasks.md                 # Task definitions
     └── init-prompt.md           # Initial prompt template
 ```
+
+## API Server
+
+The meal planner includes a RESTful API built with FastAPI for programmatic access.
+
+### Starting the API Server
+
+```bash
+# Start the FastAPI server
+uv run uvicorn src.api.main:app --reload
+```
+
+The server will be available at `http://localhost:8000` with interactive API documentation at `http://localhost:8000/docs`.
 
 ## Configuration
 
