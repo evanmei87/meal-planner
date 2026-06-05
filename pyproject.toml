@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "meal-planner"
 version = "0.1.0"
 description = "AI-driven meal planning assistant with MCP integration"
@@ -7,7 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=1.0.0",
     "pytest>=8.0.0",
+    "httpx2>=2.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

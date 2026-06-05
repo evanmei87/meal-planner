@@ -346,6 +346,34 @@ def add_saved_meal(meal_name: str, ingredients: list,
     return result
 
 
+def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
+    """
+    Add a saved meal from structured request data (for API use).
+    
+    Args:
+        meal_data: Dictionary with keys:
+            - name: Meal name
+            - ingredients: List of ingredient names
+            - macros: Dict with calories, protein, carbs, fat
+            - instructions: List of instruction steps
+            - category: Meal category (default: Dinner)
+            - tags: List of tags (optional)
+        prompt_session: Whether to prompt for new food properties (default: False for API)
+    
+    Returns:
+        dict with success status and newly added foods
+    """
+    return add_saved_meal(
+        meal_name=meal_data.get('name', ''),
+        ingredients=meal_data.get('ingredients', []),
+        macros=meal_data.get('macros', {}),
+        instructions=meal_data.get('instructions', []),
+        category=meal_data.get('category', 'Dinner'),
+        tags=meal_data.get('tags', []),
+        prompt_session=prompt_session
+    )
+
+
 def main():
     """CLI entry point for adding saved meals."""
     import argparse

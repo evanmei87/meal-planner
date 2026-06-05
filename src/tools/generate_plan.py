@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from tools.calculate_tdee import calculate_tdee, get_user_stats
+from src.tools.calculate_tdee import calculate_tdee, get_user_stats
 
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -100,6 +100,57 @@ def generate_meal_plan(state_path: str, user_query: str) -> str:
     save_state(updated_state, state_path)
 
     return format_plan_markdown(day_plans, state)
+
+
+def generate_meal_plan_from_request(state_path: str, request_data: dict) -> dict:
+    """
+    Generate a meal plan from structured request data (for API use).
+    
+    Args:
+        state_path: Path to state.json
+        request_data: Dictionary with keys:
+            - days: List of day names to generate
+            - preferences: Optional string with user preferences
+    
+    Returns:
+        Dictionary with generated plan data
+    """
+    state = load_state(state_path)
+    static_data = load_static_data()
+    
+    # Parse updates from preferences if provided
+    preferences = request_data.get('preferences', '')
+    updates = parse_user_updates(preferences) if preferences else {
+        'ate_out': False,
+        'extra_items': [],
+        'removed_items': []
+    }
+    
+    tdee = calculate_tdee_from_state(state)
+
+    # Use requested days or default to current day through Sunday
+    requested_days = request_data.get('days', [])
+    if requested_days:
+        days_to_generate = requested_days
+    else:
+        current_day = get_current_day_est()
+        state['current_day'] = current_day
+        days_to_generate = get_days_to_generate(current_day)
+
+    day_plans = []
+    for day_name in days_to_generate:
+        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates)
+        day_plans.append(day_plan)
+
+    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates)
+    save_state(updated_state, state_path)
+
+    return {
+        'plan_id': state.get('plan_id', 'unknown'),
+        'plan': day_plans,
+        'grocery_list': state.get('grocery_list', []),
+        'status': 'success'
+    }
 
 
 def parse_user_updates(query: str) -> dict:
