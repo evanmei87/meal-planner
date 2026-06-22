@@ -69,6 +69,11 @@ export const api = {
   },
   state: {
     get: () => request<AppState>('/state/'),
+    update: (body: Partial<AppState>) =>
+      request<AppState>('/state/', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
   },
   groceries: {
     add: (text: string) =>
