@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError } from '../../api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { api, ApiError } from '../../api/client'
 import { Card } from '../../components/Card'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { Spinner } from '../../components/Spinner'
+import { useAppState } from '../state/hooks'
 import { usePlan, useGeneratePlan } from './hooks'
 
 export function PlanPage() {
   const { data: planData, isLoading, isError, error } = usePlan()
+  const { data: appState } = useAppState()
   const generate = useGeneratePlan()
+  const qc = useQueryClient()
   const [selectedDay, setSelectedDay] = useState('')
   const [preferences, setPreferences] = useState('')
+  const prefInitialized = useRef(false)
 
   const days = planData?.plan ?? []
 
@@ -19,6 +24,13 @@ export function PlanPage() {
       setSelectedDay(days[0].day)
     }
   }, [days, selectedDay])
+
+  useEffect(() => {
+    if (appState !== undefined && !prefInitialized.current) {
+      setPreferences(appState.preferences ?? '')
+      prefInitialized.current = true
+    }
+  }, [appState])
 
   if (isLoading) return <Spinner />
   if (isError)
@@ -30,18 +42,30 @@ export function PlanPage() {
 
   const currentDayPlan = days.find((d) => d.day === selectedDay) ?? days[0]
 
+  function handleGenerate() {
+    generate.mutate(
+      { preferences: preferences || undefined },
+      {
+        onSuccess: async () => {
+          await api.state.update({ preferences: preferences || undefined })
+          qc.invalidateQueries({ queryKey: ['state'] })
+        },
+      }
+    )
+  }
+
   return (
     <div>
       <div className="flex gap-3 mb-6">
         <input
           type="text"
-          placeholder="Preferences (optional)"
+          placeholder="e.g. no red meat, high protein, vegetarian lunches"
           value={preferences}
           onChange={(e) => setPreferences(e.target.value)}
           className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
         />
         <button
-          onClick={() => generate.mutate({ preferences: preferences || undefined })}
+          onClick={handleGenerate}
           disabled={generate.isPending}
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
         >

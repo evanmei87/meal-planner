@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -46,6 +46,24 @@ const PLAN_DATA = {
   grocery_list: [{ item: 'Oats', quantity: 1, unit: 'cup', category: 'grain' }],
   status: 'success',
 }
+
+const EMPTY_STATE = {
+  current_day: 'Monday',
+  plan_id: '',
+  plan: [],
+  grocery_list: [],
+  missing_macros: [],
+  grocery_inventory: [],
+  unmatched_groceries: [],
+  inventory_usage: { used: [], unused: [], supplemental: [] },
+  preferences: undefined,
+}
+
+beforeEach(() => {
+  server.use(
+    http.get('http://localhost/api/state/', () => HttpResponse.json(EMPTY_STATE))
+  )
+})
 
 function renderPlanPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -111,11 +129,43 @@ describe('PlanPage', () => {
       http.post('http://localhost/api/plan/generate', () => {
         generateCalled = true
         return HttpResponse.json(PLAN_DATA)
-      })
+      }),
+      http.put('http://localhost/api/state/', () => HttpResponse.json(EMPTY_STATE))
     )
     renderPlanPage()
     await screen.findByRole('button', { name: /generate plan/i })
     fireEvent.click(screen.getByRole('button', { name: /generate plan/i }))
     await waitFor(() => expect(generateCalled).toBe(true))
+  })
+
+  it('pre-fills preferences input from stored state', async () => {
+    server.use(
+      http.get('http://localhost/api/plan/', () => HttpResponse.json(PLAN_DATA)),
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...EMPTY_STATE, preferences: 'high protein' })
+      )
+    )
+    renderPlanPage()
+    const input = await screen.findByPlaceholderText(/e\.g\. no red meat/i)
+    expect(input).toHaveValue('high protein')
+  })
+
+  it('persists preferences to state after successful plan generation', async () => {
+    let putBody: unknown = null
+    server.use(
+      http.get('http://localhost/api/plan/', () => HttpResponse.json(PLAN_DATA)),
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...EMPTY_STATE, preferences: 'high protein' })
+      ),
+      http.post('http://localhost/api/plan/generate', () => HttpResponse.json(PLAN_DATA)),
+      http.put('http://localhost/api/state/', async ({ request }) => {
+        putBody = await request.json()
+        return HttpResponse.json({ ...EMPTY_STATE, preferences: 'high protein' })
+      })
+    )
+    renderPlanPage()
+    await screen.findByRole('button', { name: /generate plan/i })
+    fireEvent.click(screen.getByRole('button', { name: /generate plan/i }))
+    await waitFor(() => expect(putBody).toMatchObject({ preferences: 'high protein' }))
   })
 })
