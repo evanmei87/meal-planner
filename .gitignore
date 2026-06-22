@@ -34,3 +34,8 @@ state.json
 # This prevents your personal history/session state from causing Git conflicts
 src/state/
 src/data/user_stats.csv
+
+# --- Frontend ---
+web/node_modules/
+web/dist/
+web/.env
