@@ -44,7 +44,7 @@ export function StatePage() {
             className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <button
-            onClick={() => updateState.mutate({ preferences: preferencesInput || undefined })}
+            onClick={() => updateState.mutate({ preferences: preferencesInput })}
             disabled={updateState.isPending}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
           >

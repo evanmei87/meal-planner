@@ -120,4 +120,22 @@ describe('StatePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /regenerate plan/i }))
     await waitFor(() => expect(generateBody).toMatchObject({ preferences: 'high protein' }))
   })
+
+  it('Save with empty input sends preferences as empty string', async () => {
+    let putBody: unknown = null
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, preferences: 'high protein' })
+      ),
+      http.put('http://localhost/api/state/', async ({ request }) => {
+        putBody = await request.json()
+        return HttpResponse.json({ ...STATE, preferences: '' })
+      })
+    )
+    renderStatePage()
+    const input = await screen.findByPlaceholderText(/e\.g\. no red meat/i)
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(putBody).toMatchObject({ preferences: '' }))
+  })
 })
