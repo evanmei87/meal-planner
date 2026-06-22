@@ -28,14 +28,18 @@ def test_get_state_success(client, api_key_headers, temp_state_file):
 
 
 def test_get_state_not_found(client, api_key_headers):
-    """Test state retrieval when state file doesn't exist."""
+    """Test state retrieval returns empty state when state file doesn't exist."""
     with patch('src.api.endpoints.state.STATE_PATH', '/nonexistent/path/state.json'):
         response = client.get(
             "/state/",
             headers=api_key_headers
         )
-        
-        assert response.status_code == 404
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["plan"] == []
+        assert data["grocery_list"] == []
+        assert data["grocery_inventory"] == []
 
 
 def test_get_state_invalid_api_key(client):
