@@ -8,6 +8,8 @@ dependencies = [
     "fastmcp>=1.0.0",
     "pytest>=8.0.0",
     "httpx2>=2.0.0",
+    "google-genai>=1.0.0",
+    "pydantic>=2.5.0",
 ]
 
 [tool.pytest.ini_options]

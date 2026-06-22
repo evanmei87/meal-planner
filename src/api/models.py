@@ -114,6 +114,9 @@ class StateResponse(BaseModel):
     plan: List[DayPlan] = Field(default_factory=list)
     grocery_list: List[GroceryItem] = Field(default_factory=list)
     missing_macros: List[str] = Field(default_factory=list)
+    grocery_inventory: List[dict] = Field(default_factory=list)
+    unmatched_groceries: List[dict] = Field(default_factory=list)
+    inventory_usage: dict = Field(default_factory=lambda: {"used": [], "unused": [], "supplemental": []})
 
 
 class UpdateStateRequest(BaseModel):
@@ -122,6 +125,9 @@ class UpdateStateRequest(BaseModel):
     grocery_list: Optional[List[GroceryItem]] = None
     missing_macros: Optional[List[str]] = None
     current_day: Optional[str] = None
+    grocery_inventory: Optional[List[dict]] = None
+    unmatched_groceries: Optional[List[dict]] = None
+    inventory_usage: Optional[dict] = None
 
 
 class ErrorResponse(BaseModel):

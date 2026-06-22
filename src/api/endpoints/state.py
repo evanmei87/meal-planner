@@ -33,7 +33,10 @@ async def get_state():
             plan_id=state.get('plan_id', 'unknown'),
             plan=state.get('plan', []),
             grocery_list=state.get('grocery_list', []),
-            missing_macros=state.get('missing_macros', [])
+            missing_macros=state.get('missing_macros', []),
+            grocery_inventory=state.get('grocery_inventory', []),
+            unmatched_groceries=state.get('unmatched_groceries', []),
+            inventory_usage=state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []})
         )
     except HTTPException:
         raise
@@ -73,7 +76,10 @@ async def update_state_endpoint(request: UpdateStateRequest):
                 'plan_id': 'uuid-v4-placeholder',
                 'plan': [],
                 'grocery_list': [],
-                'missing_macros': []
+                'missing_macros': [],
+                'grocery_inventory': [],
+                'unmatched_groceries': [],
+                'inventory_usage': {'used': [], 'unused': [], 'supplemental': []}
             }
 
         # Build update data
@@ -86,6 +92,12 @@ async def update_state_endpoint(request: UpdateStateRequest):
             update_data['missing_macros'] = request.missing_macros
         if request.current_day is not None:
             update_data['current_day'] = request.current_day
+        if request.grocery_inventory is not None:
+            update_data['grocery_inventory'] = request.grocery_inventory
+        if request.unmatched_groceries is not None:
+            update_data['unmatched_groceries'] = request.unmatched_groceries
+        if request.inventory_usage is not None:
+            update_data['inventory_usage'] = request.inventory_usage
 
         # Update state using the tool
         success = update_state(str(state_path), update_data)
@@ -101,7 +113,10 @@ async def update_state_endpoint(request: UpdateStateRequest):
             plan_id=merged_state.get('plan_id', 'unknown'),
             plan=merged_state.get('plan', []),
             grocery_list=merged_state.get('grocery_list', []),
-            missing_macros=merged_state.get('missing_macros', [])
+            missing_macros=merged_state.get('missing_macros', []),
+            grocery_inventory=merged_state.get('grocery_inventory', []),
+            unmatched_groceries=merged_state.get('unmatched_groceries', []),
+            inventory_usage=merged_state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []})
         )
     except HTTPException:
         raise

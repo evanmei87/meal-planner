@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from src.tools.calculate_tdee import calculate_tdee, get_user_stats
+from src.tools.grocery_inventory import get_inventory, is_perishable, record_inventory_usage
+from src.tools.load_saved_meals import load_saved_meals
 
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -41,7 +43,10 @@ def _default_state() -> dict:
         'plan_id': 'uuid-v4-placeholder',
         'plan': [],
         'grocery_list': [],
-        'missing_macros': []
+        'missing_macros': [],
+        'grocery_inventory': [],
+        'unmatched_groceries': [],
+        'inventory_usage': {'used': [], 'unused': [], 'supplemental': []}
     }
 
 
@@ -81,6 +86,8 @@ def get_next_day(day: str) -> str:
 def generate_meal_plan(state_path: str, user_query: str) -> str:
     """
     Generate a meal plan based on current state and user query.
+    When inventory exists, prioritize meals that use inventory items and
+    produce a supplemental grocery list for missing ingredients.
     """
     state = load_state(state_path)
     static_data = load_static_data()
@@ -91,33 +98,37 @@ def generate_meal_plan(state_path: str, user_query: str) -> str:
     state['current_day'] = current_day
     days_to_generate = get_days_to_generate(current_day)
 
+    inventory = get_inventory()
+
+    candidate_meals = _build_candidate_meals(state, inventory)
+
     day_plans = []
     for day_name in days_to_generate:
-        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates)
+        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates, candidates=candidate_meals)
         day_plans.append(day_plan)
 
-    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates)
+    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates, inventory=inventory)
     save_state(updated_state, state_path)
 
-    return format_plan_markdown(day_plans, state)
+    return format_plan_markdown(day_plans, updated_state)
 
 
 def generate_meal_plan_from_request(state_path: str, request_data: dict) -> dict:
     """
     Generate a meal plan from structured request data (for API use).
-    
+
     Args:
         state_path: Path to state.json
         request_data: Dictionary with keys:
             - days: List of day names to generate
             - preferences: Optional string with user preferences
-    
+
     Returns:
         Dictionary with generated plan data
     """
     state = load_state(state_path)
     static_data = load_static_data()
-    
+
     # Parse updates from preferences if provided
     preferences = request_data.get('preferences', '')
     updates = parse_user_updates(preferences) if preferences else {
@@ -125,7 +136,7 @@ def generate_meal_plan_from_request(state_path: str, request_data: dict) -> dict
         'extra_items': [],
         'removed_items': []
     }
-    
+
     tdee = calculate_tdee_from_state(state)
 
     # Use requested days or default to current day through Sunday
@@ -137,18 +148,21 @@ def generate_meal_plan_from_request(state_path: str, request_data: dict) -> dict
         state['current_day'] = current_day
         days_to_generate = get_days_to_generate(current_day)
 
+    inventory = get_inventory()
+    candidate_meals = _build_candidate_meals(state, inventory)
+
     day_plans = []
     for day_name in days_to_generate:
-        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates)
+        day_plan = generate_day_plan(tdee, day_name, state, static_data, updates, candidates=candidate_meals)
         day_plans.append(day_plan)
 
-    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates)
+    updated_state = update_plan_in_state(state, day_plans, days_to_generate, updates, inventory=inventory)
     save_state(updated_state, state_path)
 
     return {
         'plan_id': state.get('plan_id', 'unknown'),
         'plan': day_plans,
-        'grocery_list': state.get('grocery_list', []),
+        'grocery_list': updated_state.get('grocery_list', []),
         'status': 'success'
     }
 
@@ -222,32 +236,79 @@ EXTRA_SNACK_OPTIONS = [
 _CORE_SLOTS = [BREAKFAST_OPTIONS, LUNCH_OPTIONS, DINNER_OPTIONS]
 
 
+def _inventory_lookup_key(name: str) -> str:
+    return name.lower().strip()
+
+
+def _build_candidate_meals(state: dict, inventory: list[dict]) -> list[dict]:
+    hardcoded = []
+    for slot in _CORE_SLOTS:
+        hardcoded.extend(slot)
+    hardcoded.append(PROTEIN_SHAKE)
+    hardcoded.extend(EXTRA_SNACK_OPTIONS)
+
+    saved = load_saved_meals()
+    combined = list(hardcoded)
+    for meal in saved:
+        if meal.get("category", "").lower() in {"breakfast", "lunch", "dinner", "snack"}:
+            combined.append({
+                "name": meal["name"],
+                "calories": meal["macros"].get("calories", 0),
+                "macros": meal["macros"],
+                "ingredients": meal.get("ingredients", []),
+                "category": meal.get("category", ""),
+            })
+
+    inventory_names = {_inventory_lookup_key(i.get("standardized_item", i.get("raw_phrase", ""))) for i in inventory}
+
+    scored = []
+    for meal in combined:
+        ingredients = [i for i in meal.get("ingredients", [])]
+        matched = sum(1 for ing in ingredients if _inventory_lookup_key(ing) in inventory_names)
+        perishable_matched = sum(2 for ing in ingredients if is_perishable({"standardized_item": ing, "raw_phrase": ing}) and _inventory_lookup_key(ing) in inventory_names)
+        score = matched + perishable_matched
+        scored.append((score, meal))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [m for _, m in scored]
+
+
 def _pick_meal(slot_options: list[dict], day_index: int) -> dict:
     """Pick a meal from slot_options cycling by day_index so each day varies."""
     return slot_options[day_index % len(slot_options)]
 
 
-def generate_day_plan(tdee: float, day_name: str, state: dict, static_data: dict, updates: dict) -> dict:
+def generate_day_plan(tdee: float, day_name: str, state: dict, static_data: dict, updates: dict, candidates: list[dict] | None = None) -> dict:
     """Generate meal plan for a single day, compliant with meal-plan-requirements.md."""
     is_pre_long_run = 'friday' in day_name.lower()
     target_calories = 2700 if is_pre_long_run else 2250
 
     day_index = DAYS.index(day_name)
 
-    # Core meals: breakfast, lunch, dinner
-    meals = []
-    for slot in _CORE_SLOTS:
-        meal = _pick_meal(slot, day_index)
-        meals.append(meal)
+    if candidates:
+        inventory = get_inventory()
+        inventory_names = {_inventory_lookup_key(i.get("standardized_item", i.get("raw_phrase", ""))) for i in inventory}
 
-    # Always include protein shake for minimum 2 scoops per day
-    meals.append(PROTEIN_SHAKE)
-
-    # Add extra snack if calories permit
-    core_with_shake = sum(m['calories'] for m in meals)
-    extra = _pick_meal(EXTRA_SNACK_OPTIONS, day_index)
-    if core_with_shake + extra['calories'] <= target_calories:
-        meals.append(extra)
+        day_meals = []
+        seen = set()
+        needed_calories = target_calories
+        for meal in candidates:
+            if len(day_meals) >= 4:
+                break
+            name = meal.get("name")
+            if name in seen:
+                continue
+            ingredients = [i for i in meal.get("ingredients", [])]
+            has_match = any(_inventory_lookup_key(i) in inventory_names for i in ingredients)
+            meal_cals = meal.get("calories", 0)
+            if meal_cals > needed_calories and len(day_meals) >= 1:
+                continue
+            day_meals.append(meal)
+            seen.add(name)
+            needed_calories -= meal_cals
+        meals = day_meals if day_meals else _fallback_day_meals(day_index, target_calories)
+    else:
+        meals = _fallback_day_meals(day_index, target_calories)
 
     total_calories = sum(m['calories'] for m in meals)
     total_protein = sum(m['macros']['protein'] for m in meals)
@@ -260,6 +321,18 @@ def generate_day_plan(tdee: float, day_name: str, state: dict, static_data: dict
         'total_protein': total_protein,
         'total_carbs': total_carbs
     }
+
+
+def _fallback_day_meals(day_index: int, target_calories: int) -> list[dict]:
+    meals = []
+    for slot in _CORE_SLOTS:
+        meals.append(_pick_meal(slot, day_index))
+    meals.append(PROTEIN_SHAKE)
+    core_with_shake = sum(m['calories'] for m in meals)
+    extra = _pick_meal(EXTRA_SNACK_OPTIONS, day_index)
+    if core_with_shake + extra['calories'] <= target_calories:
+        meals.append(extra)
+    return meals
 
 
 # Per-serving quantities. Merge logic sums across days for correct weekly totals.
@@ -294,7 +367,7 @@ _INGREDIENT_MAP = {
 }
 
 
-def update_plan_in_state(state: dict, day_plans: list[dict], days_generated: list[str], updates: dict) -> dict:
+def update_plan_in_state(state: dict, day_plans: list[dict], days_generated: list[str], updates: dict, inventory: list[dict] | None = None) -> dict:
     """Update state with new plan and consolidated grocery list."""
     state['plan'] = day_plans
 
@@ -314,10 +387,57 @@ def update_plan_in_state(state: dict, day_plans: list[dict], days_generated: lis
         else:
             merged[key] = dict(item)
 
-    state['grocery_list'] = list(merged.values())
+    inventory_names = set()
+    if inventory:
+        inventory_names = {_inventory_lookup_key(i.get("standardized_item", i.get("raw_phrase", ""))) for i in inventory}
 
-    if updates['ate_out']:
+    used = []
+    unused = []
+    for item in inventory or []:
+        name = _inventory_lookup_key(item.get("standardized_item", item.get("raw_phrase", "")))
+        if any(name == _inventory_lookup_key(i) for day in day_plans for meal in day['meals'] for i in meal.get('ingredients', [])):
+            used.append(item)
+        else:
+            unused.append(item)
+
+    supplemental = []
+    grocery_list = list(merged.values())
+    if inventory:
+        for day in day_plans:
+            for meal in day['meals']:
+                for ingredient in meal.get('ingredients', []):
+                    if _inventory_lookup_key(ingredient) in inventory_names:
+                        continue
+                    mapped = _INGREDIENT_MAP.get(ingredient)
+                    if mapped:
+                        supplemental.append(dict(mapped))
+                    else:
+                        supplemental.append({
+                            'item': ingredient,
+                            'quantity': 1,
+                            'unit': 'count/whole',
+                            'category': 'Other',
+                        })
+
+        merged_supplemental: dict[str, dict] = {}
+        for item in supplemental:
+            key = item['item']
+            if key in merged_supplemental:
+                merged_supplemental[key]['quantity'] += item['quantity']
+            else:
+                merged_supplemental[key] = dict(item)
+        grocery_list = list(merged_supplemental.values())
+
+    state['grocery_list'] = grocery_list
+
+    if updates['ate_out'] and state['plan']:
         state['plan'][-1]['meals'] = []
+
+    state['inventory_usage'] = {
+        'used': used,
+        'unused': unused,
+        'supplemental': supplemental,
+    }
 
     return state
 
@@ -355,13 +475,17 @@ def format_plan_markdown(day_plans: list[dict], state: dict) -> str:
             continue
         lines.append(f"**{cat}**")
         for item in items:
-            lines.append(f"- {item['item']}: {item['quantity']} {item['unit']}")
+            quantity = item.get('quantity', 1)
+            unit = item.get('unit', 'count/whole')
+            lines.append(f"- {item.get('item', 'Unknown')}: {quantity} {unit}")
         lines.append("")
 
     for cat, items in grouped.items():
         lines.append(f"**{cat}**")
         for item in items:
-            lines.append(f"- {item['item']}: {item['quantity']} {item['unit']}")
+            quantity = item.get('quantity', 1)
+            unit = item.get('unit', 'count/whole')
+            lines.append(f"- {item.get('item', 'Unknown')}: {quantity} {unit}")
         lines.append("")
 
     lines.append("```")
