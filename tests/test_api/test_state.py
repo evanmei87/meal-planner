@@ -158,3 +158,7 @@ def test_update_state_persists_preferences(client, api_key_headers, temp_state_f
 
     assert response.status_code == 200
     assert response.json()['preferences'] == 'vegetarian lunches'
+    mock_update.assert_called_once_with(
+        str(temp_state_file),
+        {'preferences': 'vegetarian lunches'}
+    )

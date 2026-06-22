@@ -34,6 +34,7 @@ async def get_state():
                 grocery_inventory=[],
                 unmatched_groceries=[],
                 inventory_usage={"used": [], "unused": [], "supplemental": []},
+                preferences=None,
             )
 
         state = json.loads(state_path.read_text())

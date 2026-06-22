@@ -2,9 +2,15 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
+import { api } from '../../api/client'
 import { StatePage } from './StatePage'
+
+function PlanObserver() {
+  useQuery({ queryKey: ['plan'], queryFn: api.plan.get })
+  return null
+}
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -119,6 +125,36 @@ describe('StatePage', () => {
     renderStatePage()
     fireEvent.click(await screen.findByRole('button', { name: /regenerate plan/i }))
     await waitFor(() => expect(generateBody).toMatchObject({ preferences: 'high protein' }))
+  })
+
+  it('Regenerate Plan invalidates both state and plan queries', async () => {
+    let planFetched = false
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, plan_id: 'abc-123', preferences: 'high protein' })
+      ),
+      http.post('http://localhost/api/plan/generate', async () =>
+        HttpResponse.json({ plan_id: 'abc-123', plan: [], grocery_list: [], status: 'success' })
+      ),
+      http.get('http://localhost/api/plan/', () => {
+        planFetched = true
+        return HttpResponse.json({ plan_id: 'abc-123', plan: [], grocery_list: [], status: 'success' })
+      })
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <PlanObserver />
+          <StatePage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    // Wait for the initial plan fetch to complete before triggering regenerate
+    await waitFor(() => expect(planFetched).toBe(true))
+    planFetched = false
+    fireEvent.click(await screen.findByRole('button', { name: /regenerate plan/i }))
+    await waitFor(() => expect(planFetched).toBe(true))
   })
 
   it('Save with empty input sends preferences as empty string', async () => {

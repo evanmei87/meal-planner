@@ -56,7 +56,12 @@ export function StatePage() {
             onClick={() =>
               generatePlan.mutate(
                 { preferences: preferencesInput || undefined },
-                { onSuccess: () => qc.invalidateQueries({ queryKey: ['state'] }) }
+                {
+                  onSuccess: () => {
+                    qc.invalidateQueries({ queryKey: ['state'] })
+                    qc.invalidateQueries({ queryKey: ['plan'], refetchType: 'all' })
+                  },
+                }
               )
             }
             disabled={generatePlan.isPending}
