@@ -91,12 +91,12 @@ async def get_current_plan():
         import json
         state_path = Path(STATE_PATH)
         if not state_path.exists():
-            raise HTTPException(status_code=404, detail="State file not found")
+            return MealPlanResponse(plan_id='', plan=[], grocery_list=[], status='success')
 
         state = json.loads(state_path.read_text())
 
         return MealPlanResponse(
-            plan_id=state.get('plan_id', 'unknown'),
+            plan_id=state.get('plan_id', ''),
             plan=state.get('plan', []),
             grocery_list=state.get('grocery_list', []),
             status='success'

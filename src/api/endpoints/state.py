@@ -24,7 +24,16 @@ async def get_state():
         import json
         state_path = Path(STATE_PATH)
         if not state_path.exists():
-            raise HTTPException(status_code=404, detail="State file not found")
+            return StateResponse(
+                current_day='Monday',
+                plan_id='',
+                plan=[],
+                grocery_list=[],
+                missing_macros=[],
+                grocery_inventory=[],
+                unmatched_groceries=[],
+                inventory_usage={"used": [], "unused": [], "supplemental": []},
+            )
 
         state = json.loads(state_path.read_text())
 

@@ -118,11 +118,14 @@ def test_get_current_plan_success(client, api_key_headers, sample_day_plan, temp
 
 
 def test_get_current_plan_state_not_found(client, api_key_headers):
-    """Test getting plan when state file doesn't exist."""
+    """Test getting plan returns empty state when state file doesn't exist."""
     with patch('src.api.endpoints.meal_plan.STATE_PATH', '/nonexistent/path/state.json'):
         response = client.get(
             "/plan/",
             headers=api_key_headers
         )
-        
-        assert response.status_code == 404
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["plan"] == []
+        assert data["grocery_list"] == []

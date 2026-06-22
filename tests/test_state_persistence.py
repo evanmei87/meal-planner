@@ -73,8 +73,9 @@ class TestStatePersistence:
         assert success is True
     
     def test_save_state_failure(self):
-        """Test that save_state returns False on failure."""
-        # Try to save to non-existent path
-        success = save_state({}, '/nonexistent/path/state.json')
-        
+        """Test that save_state returns False on I/O failure."""
+        from unittest.mock import patch
+        with patch('pathlib.Path.write_text', side_effect=OSError('disk full')):
+            success = save_state({}, 'src/state/state.json')
+
         assert success is False

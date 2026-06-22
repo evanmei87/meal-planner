@@ -54,6 +54,7 @@ def save_state(state: dict, state_path: str) -> bool:
     """Save state to JSON file."""
     state_file = Path(state_path)
     try:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
         state_file.write_text(json.dumps(state, indent=2))
         return True
     except Exception:

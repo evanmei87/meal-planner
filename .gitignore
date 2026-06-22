@@ -32,5 +32,11 @@ state.json
 
 # --- Project-Specific Runtime State ---
 # This prevents your personal history/session state from causing Git conflicts
-src/state/
+src/state/*
+!src/state/.gitkeep
 src/data/user_stats.csv
+
+# --- Frontend ---
+web/node_modules/
+web/dist/
+web/.env

@@ -23,6 +23,7 @@ def _load_state() -> dict:
 
 def _save_state(state: dict) -> bool:
     try:
+        STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         STATE_PATH.write_text(json.dumps(state, indent=2))
         return True
     except OSError:

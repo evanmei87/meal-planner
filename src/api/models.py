@@ -134,3 +134,27 @@ class ErrorResponse(BaseModel):
     """Error response model."""
     error: str
     details: Optional[str] = None
+
+
+class GroceriesRequest(BaseModel):
+    """Request to parse natural-language grocery text."""
+    text: str = Field(..., min_length=1, description="Natural language grocery description")
+
+
+class GroceryParseResult(BaseModel):
+    """Single parsed grocery item row."""
+    raw_phrase: str
+    standardized_item: str
+    quantity: float
+    unit: str
+    match: str
+    confidence_score: float
+    confidence_level: str
+    status: str  # "auto" | "review" | "manual"
+
+
+class GroceriesResponse(BaseModel):
+    """Response after parsing and saving grocery text."""
+    items: List[GroceryParseResult]
+    saved_count: int
+    review_count: int
