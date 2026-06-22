@@ -187,20 +187,56 @@ def add_new_food(food_name: str, specialty_content: str, macros_data: dict) -> t
     return True, food_name
 
 
+def validate_macro_entry(portion: str, calories: str, protein: str, carbs: str, fat: str) -> tuple[bool, dict | None]:
+    try:
+        c = int(calories)
+        p = int(protein)
+        carb = int(carbs)
+        f = int(fat)
+    except (TypeError, ValueError):
+        return False, None
+    if not portion or c < 0 or p < 0 or carb < 0 or f < 0:
+        return False, None
+    return True, {
+        'portion': portion,
+        'calories': c,
+        'protein': p,
+        'carbs': carb,
+        'fat': f,
+    }
+
+
+def append_specialty_ingredient(food_name: str, macros_data: dict, specialty_content: str) -> tuple[bool, str, str]:
+    specialty_path = Path(__file__).parent.parent / 'data' / 'specialty-ingredients.md'
+    row = f"| {food_name}"
+    row += " | " + macros_data.get('portion', '')
+    row += " | " + str(macros_data.get('calories', 0))
+    row += " | " + str(macros_data.get('protein', 0)) + "g"
+    row += " | " + str(macros_data.get('carbs', 0)) + "g"
+    row += " | " + str(macros_data.get('fat', 0)) + "g"
+    row += " |"
+    new_lines = specialty_content.split('\n')
+    if new_lines and new_lines[-1].strip() != '':
+        new_lines.append('')
+    new_lines.append(row)
+    specialty_path.write_text('\n'.join(new_lines))
+    return True, food_name, '\n'.join(new_lines)
+
+
 def validate_meal_params(meal_name: str, ingredients: list,
                           macros: dict, instructions: list) -> list:
     """Validate meal parameters and return list of error messages."""
     errors = []
-    
+
     if not meal_name or not meal_name.strip():
         errors.append("Meal name is required and cannot be empty.")
-    
+
     if not ingredients or all(not ing.strip() for ing in ingredients):
         errors.append("At least one ingredient is required.")
-    
+
     if not instructions or all(not inst.strip() for inst in instructions):
         errors.append("At least one instruction step is required.")
-    
+
     if macros:
         non_numeric = False
         try:
@@ -216,7 +252,7 @@ def validate_meal_params(meal_name: str, ingredients: list,
             if macros.get('calories', 0) < 0 or macros.get('protein', 0) < 0 \
                or macros.get('carbs', 0) < 0 or macros.get('fat', 0) < 0:
                 errors.append("Macro values cannot be negative.")
-    
+
     return errors
 
 

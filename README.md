@@ -82,6 +82,48 @@ Creates a fresh 7-day meal plan based on current preferences.
 ```
 Displays the consolidated grocery list for your 7-day plan.
 
+### Adding Groceries from Natural Language
+```
+>>> add_groceries I got two pounds boneless chicken thighs, spinach, and half a pound of salmon.
+```
+Parses the description via Gemini, auto-saves high-confidence matches (>= 0.7), prompts for review or manual entry on lower-confidence items, and stores results in `grocery_inventory`.
+
+### Viewing Grocery Inventory
+```
+>>> show_inventory
+```
+Displays parsed grocery inventory with confidence scores and match source.
+
+### Clearing Grocery Inventory
+```
+>>> clear_inventory
+```
+Clears the grocery inventory and unmatched items.
+
+## Confidence Scoring
+
+All LLM-assisted grocery parsing uses a normalized `0.0` to `1.0` confidence scale:
+
+- `>= 0.7` — **High confidence**: auto-saved to inventory without prompting.
+- `0.4` to `0.699` — **Review confidence**: presented for user confirmation.
+- `< 0.4` — **Low confidence**: requires manual macro entry and is saved to `specialty-ingredients.md`.
+
+Confidence scores are displayed in all grocery command output, e.g.:
+```
+| 2 lbs boneless chicken thighs | Chicken Thighs | 2 | lbs | Chicken thigh, ... | 0.86 high | auto |
+```
+
+## Inventory-Aware Meal Generation
+
+When `grocery_inventory` is populated:
+
+1. Meal candidates are ranked by how many ingredients they cover from your inventory.
+2. Perishable items (protein, dairy, vegetable, fruit) receive extra weight.
+3. The `grocery_list` becomes the **supplemental** list of ingredients still needed.
+4. `inventory_usage` is recorded in state as `{used, unused, supplemental}`.
+
+When no inventory exists, the existing deterministic generation behavior remains unchanged.
+
 ## Saved Meals Feature
 
 Manage a personal library of reusable meal recipes with automatic nutritional tracking and ingredient validation.
@@ -189,7 +231,12 @@ meal-planner/
 │   ├── tools/                    # Core logic modules
 │   │   ├── generate_plan.py      # Meal plan generation
 │   │   ├── calculate_tdee.py     # TDEE calculation
-│   │   └── update_state.py       # State persistence
+│   │   ├── update_state.py       # State persistence
+│   │   ├── confidence.py         # Shared LLM confidence scoring
+│   │   ├── llm_agent.py          # Reusable Gemini agent wrapper
+│   │   ├── food_processor.py     # Ingredient parsing and CORGIS matching
+│   │   ├── grocery_inventory.py  # Inventory persistence and CLI formatting
+│   │   └── add_saved_meal.py     # Add meals with auto-add for new foods
 │   └── server.py                 # Server logic
 ├── tests/                        # Test suite
 │   ├── conftest.py              # Test fixtures

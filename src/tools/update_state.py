@@ -25,7 +25,10 @@ def update_state(state_path: str, updated_plan: dict) -> bool:
                 'plan_id': 'uuid-v4-placeholder',
                 'plan': [],
                 'grocery_list': [],
-                'missing_macros': []
+                'missing_macros': [],
+                'grocery_inventory': [],
+                'unmatched_groceries': [],
+                'inventory_usage': {'used': [], 'unused': [], 'supplemental': []}
             }
 
         # Update with new plan
@@ -33,6 +36,12 @@ def update_state(state_path: str, updated_plan: dict) -> bool:
         existing_state['grocery_list'] = updated_plan.get('grocery_list', existing_state['grocery_list'])
         existing_state['missing_macros'] = updated_plan.get('missing_macros', existing_state['missing_macros'])
         existing_state['current_day'] = updated_plan.get('current_day', existing_state['current_day'])
+        if 'grocery_inventory' in updated_plan:
+            existing_state['grocery_inventory'] = updated_plan['grocery_inventory']
+        if 'unmatched_groceries' in updated_plan:
+            existing_state['unmatched_groceries'] = updated_plan['unmatched_groceries']
+        if 'inventory_usage' in updated_plan:
+            existing_state['inventory_usage'] = updated_plan['inventory_usage']
 
         # Save updated state
         state_file.write_text(json.dumps(existing_state, indent=2))
