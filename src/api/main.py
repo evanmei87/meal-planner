@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from fastapi import FastAPI, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
-from src.api.endpoints import meal_plan, meals, state
+from src.api.endpoints import meal_plan, meals, state, groceries
 
 app = FastAPI(
     title="Meal Planner API",
@@ -49,6 +49,7 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
 app.include_router(meal_plan.router, dependencies=[Security(get_api_key)])
 app.include_router(meals.router, dependencies=[Security(get_api_key)])
 app.include_router(state.router, dependencies=[Security(get_api_key)])
+app.include_router(groceries.router, dependencies=[Security(get_api_key)])
 
 
 @app.get("/")
