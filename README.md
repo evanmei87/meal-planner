@@ -1,26 +1,18 @@
 # Food & Nutrition Intelligence: 7-Day Meal Planner
 
-An AI-driven meal planning assistant that generates personalized 7-day meal plans, tracks nutritional intake, manages grocery inventory, supports saved meals, and exposes both CLI and FastAPI interfaces.
+An AI-driven meal planning assistant that generates personalized 7-day meal plans, tracks nutritional intake, manages grocery inventory, and supports saved meals — all accessible through a web UI.
 
 ## Table of Contents
 
 - [Features](#features)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Environment Setup](#environment-setup)
-- [Ways to Run](#ways-to-run)
-  - [1. Interactive Meal Planner CLI](#1-interactive-meal-planner-cli)
-  - [2. Command CLI](#2-command-cli)
-  - [3. REST API Server](#3-rest-api-server)
-- [Data Loaded at Startup](#data-loaded-at-startup)
+- [Setup](#setup)
+- [Running the App](#running-the-app)
+- [Using the Web UI](#using-the-web-ui)
+- [Data & Configuration](#data--configuration)
 - [Confidence Scoring](#confidence-scoring)
-- [Inventory-Aware Meal Generation](#inventory-aware-meal-generation)
-- [Saved Meals](#saved-meals)
-- [Configuration](#configuration)
 - [Development](#development)
 - [Architecture Overview](#architecture-overview)
-  - [State Management](#state-management)
-  - [Generation Pipeline](#generation-pipeline)
 - [Project Structure](#project-structure)
 - [License](#license)
 
@@ -28,35 +20,33 @@ An AI-driven meal planning assistant that generates personalized 7-day meal plan
 
 - Generate 7-day meal plans aligned with user preferences and nutritional goals
 - Track nutritional macros and caloric intake
-- Manage grocery lists and grocery inventory
+- Manage grocery lists and grocery inventory with natural-language input
 - Save, list, and search reusable meals
 - Persist state across sessions
-- Expose meal planning workflows through a REST API
 
 ## Prerequisites
 
-- [mise](https://mise.jdx.dev) - tool version manager
-- [uv](https://docs.astral.sh/uv/) - Python package and project manager
+- [mise](https://mise.jdx.dev) — tool version manager (manages Node.js)
+- [uv](https://docs.astral.sh/uv/) — Python package and project manager
 
-## Installation
+## Setup
+
+### 1. Install dependencies
 
 ```bash
-# Install the Python version specified in your mise configuration
+# Install Python and Node versions declared in mise.toml
 mise install
 
-# Create a virtual environment using uv
-uv venv
-
 # Install Python dependencies
-uv pip install -r requirements.txt
-
-# If pyproject.toml is fully configured for uv, this may also work
 uv sync
+
+# Install frontend dependencies
+cd web && npm install && cd ..
 ```
 
-## Environment Setup
+### 2. Configure environment variables
 
-Some workflows call the API or LLM-backed grocery parsing. Create a local `.env` file from the example file, then set your keys.
+**Backend** — copy the example and fill in your keys:
 
 PowerShell:
 
@@ -72,248 +62,140 @@ cp .env.example .env
 nano .env
 ```
 
-Your `.env` file should contain:
+Your `.env` should contain:
 
 ```env
 MEAL_PLANNER_API_KEY=dev-key-change-in-production
 GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
-### Environment Variables
+- `MEAL_PLANNER_API_KEY` — required by the API server. For local development, `dev-key-change-in-production` is the default.
+- `GEMINI_API_KEY` — used for LLM-backed grocery parsing. Create one at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
-- `MEAL_PLANNER_API_KEY` - API key required by authenticated FastAPI endpoints. For local development, `dev-key-change-in-production` matches the default used by the app.
-- `GEMINI_API_KEY` - Gemini API key used for LLM-backed grocery parsing and ingredient matching. Create one at `https://aistudio.google.com/app/apikey`.
-
-Never commit `.env` to version control. For production or shared environments, replace `dev-key-change-in-production` with a stronger `MEAL_PLANNER_API_KEY`.
-
-## Ways to Run
-
-This project has three main entry points. Use the one that matches how you want to interact with the service.
-
-### 1. Interactive Meal Planner CLI
-
-Run the prompt-based meal planner interface:
-
-```bash
-uv run src/server.py
-```
-
-Use this when you want an interactive terminal session with commands like:
-
-```text
-show_profile
-generate_plan
-show_groceries
-add_groceries I got two pounds boneless chicken thighs, spinach, and half a pound of salmon.
-show_inventory
-clear_inventory
-help
-exit
-```
-
-This entry point also includes helper commands that call the REST API if the API server is running:
-
-```text
-api plan generate
-api meals list
-api meals search bowl
-api state get
-```
-
-By default, API helper commands target `http://localhost:8000`. Override with:
+**Frontend** — copy the web example:
 
 PowerShell:
 
 ```powershell
-$env:MEAL_PLANNER_API_URL = "http://localhost:8000"
-uv run src/server.py
+Copy-Item web\.env.example web\.env
 ```
 
 macOS/Linux:
 
 ```bash
-MEAL_PLANNER_API_URL=http://localhost:8000 uv run src/server.py
+cp web/.env.example web/.env
 ```
 
-### 2. Command CLI
+Your `web/.env` should contain:
 
-Run one-off commands for saved meals, meal generation, and grocery inventory:
-
-```bash
-uv run main.py --help
+```env
+VITE_API_KEY=dev-key-change-in-production
 ```
 
-Generate a meal plan:
+This must match `MEAL_PLANNER_API_KEY` in your backend `.env`.
 
-```bash
-uv run main.py generate
-```
+Never commit either `.env` file to version control.
 
-Add groceries from natural language:
+## Running the App
 
-```bash
-uv run main.py groceries add --text "I got two pounds boneless chicken thighs, spinach, and half a pound of salmon."
-```
+The web UI requires both the API server and the frontend dev server to be running. Open two terminals:
 
-List or clear grocery inventory:
-
-```bash
-uv run main.py groceries list
-uv run main.py groceries clear
-```
-
-Add a saved meal:
-
-```bash
-uv run main.py add \
-  --name "Chicken & Rice Bowl" \
-  --ingredients "Chicken Breast, White Rice, Broccoli" \
-  --macros "450|35|50|12" \
-  --instructions "Cook chicken in a pan;Cook rice in a pot;Steam broccoli;Combine everything" \
-  --category "Dinner" \
-  --tags "high_protein,quick"
-```
-
-List saved meals:
-
-```bash
-uv run main.py list
-uv run main.py list --category Breakfast
-uv run main.py list --search "bowl"
-uv run main.py list --format verbose
-```
-
-Search saved meals:
-
-```bash
-uv run main.py search --category Lunch
-uv run main.py search --min-cal 300 --max-cal 600 --min-prot 20
-uv run main.py search --ingredient "Chicken Breast"
-uv run main.py search --tag "high_protein"
-uv run main.py search --category Dinner --min-cal 400 --tag "quick"
-```
-
-Supported search filters: `--category`, `--search`, `--min-cal`, `--max-cal`, `--min-prot`, `--max-prot`, `--min-carb`, `--max-carb`, `--min-fat`, `--max-fat`, `--ingredient`, `--tag`.
-
-### 3. REST API Server
-
-Start the FastAPI server:
-
-```bash
-uv run uvicorn src.api.main:app
-```
-
-For development with automatic reload:
+**Terminal 1 — API server:**
 
 ```bash
 uv run uvicorn src.api.main:app --reload
 ```
 
-The API is available at:
+The API starts at `http://localhost:8000`.
 
-```text
-http://localhost:8000
-```
-
-Interactive API docs are available at:
-
-```text
-http://localhost:8000/docs
-```
-
-Authenticated endpoints require the `X-API-Key` header:
+**Terminal 2 — Frontend dev server:**
 
 ```bash
-curl -H "X-API-Key: dev-key-change-in-production" http://localhost:8000/state/
+cd web
+npm run dev
 ```
 
-## Data Loaded at Startup
+The web UI starts at `http://localhost:5173`. Open that URL in your browser.
+
+## Using the Web UI
+
+The app has four sections, accessible from the top navigation bar:
+
+### Plan
+
+View your current 7-day meal plan. Switch between days using the day selector. Each meal card shows name, calories, and macros and links to the meal's detail page. Click **Generate Plan** to create a new plan (optionally enter preferences in the text field first).
+
+### Meals
+
+Browse your saved meals in a searchable table. Use the search bar to filter by name. Click **Add Meal** to save a new meal with ingredients, macros, instructions, category, and tags. Click any meal name to view its full detail page.
+
+### Groceries
+
+Add groceries using natural language — type something like "I got two pounds of chicken thighs, a bag of spinach, and some Greek yogurt" and press **Add**. The app parses the text and shows a result table with standardized items, quantities, confidence scores, and save status. Your current grocery list and inventory are displayed below.
+
+### State
+
+Read-only view of your current day, plan ID, inventory usage (used, unused, supplemental), unmatched groceries, and missing macros.
+
+## Data & Configuration
 
 The planner reads preferences, foods, recipes, and state from `src/data/` and `src/state/`:
 
-- `src/data/food.csv` - standardized food database
-- `src/data/specialty-ingredients.md` - specialty food items and macros
-- `src/data/rules.md` - hard constraints, allergies, and dislikes
-- `src/data/meal-recipes.md` - reusable meal recipes
-- `src/data/user_stats.csv` - optional personal metrics for TDEE calculation
-- `src/state/state.json` - generated plans, grocery lists, inventory, and session state
+- `src/data/food.csv` — standardized food database
+- `src/data/specialty-ingredients.md` — specialty food items and macros
+- `src/data/rules.md` — hard constraints, allergies, and dislikes
+- `src/data/meal-recipes.md` — reusable meal recipes
+- `src/data/user_stats.csv` — optional personal metrics for TDEE calculation
+- `src/state/state.json` — generated plans, grocery lists, inventory, and session state
 
 If `user_stats.csv` is not present, the planner falls back to default stats.
 
 ## Confidence Scoring
 
-LLM-assisted grocery parsing uses a normalized `0.0` to `1.0` confidence scale:
+LLM-assisted grocery parsing uses a normalized `0.0–1.0` confidence scale:
 
-- `>= 0.7` - high confidence; auto-saved to inventory
-- `0.4` to `0.699` - review confidence; presented for confirmation
-- `< 0.4` - low confidence; requires manual macro entry and can be saved to `specialty-ingredients.md`
-
-Example grocery output:
-
-```text
-| 2 lbs boneless chicken thighs | Chicken Thighs | 2 | lbs | Chicken thigh, ... | 0.86 high | auto |
-```
-
-## Inventory-Aware Meal Generation
-
-When `grocery_inventory` is populated:
-
-1. Meal candidates are ranked by how many inventory ingredients they use.
-2. Perishable items such as protein, dairy, vegetables, and fruit receive extra weight.
-3. The `grocery_list` becomes the supplemental list of ingredients still needed.
-4. `inventory_usage` is recorded in state as `{used, unused, supplemental}`.
-
-When no inventory exists, deterministic generation behavior remains unchanged.
-
-## Saved Meals
-
-Saved meals are reusable recipes with ingredients, macros, instructions, category, and tags.
-
-When adding a meal with an ingredient not found in `specialty-ingredients.md` or `food.csv`, the tool prompts for macro data and appends the new ingredient to `specialty-ingredients.md`.
-
-Example:
-
-```bash
-uv run main.py add \
-  --name "Quinoa Bowl" \
-  --ingredients "Quinoa, Spinach" \
-  --macros "300|12|50|8" \
-  --instructions "Cook quinoa;Add spinach" \
-  --category Lunch
-```
-
-## Configuration
-
-Edit these files to customize the planner:
-
-- `src/data/food.csv` - standardized food database
-- `src/data/specialty-ingredients.md` - specialty nutritional data
-- `src/data/rules.md` - constraints, allergies, and dislikes
-- `src/data/user_stats.csv` - optional personal stats
-- `src/state/state.json` - generated state, modified automatically
+- `>= 0.7` — high confidence; auto-saved to inventory
+- `0.4–0.699` — review confidence; presented for confirmation
+- `< 0.4` — low confidence; requires manual macro entry
 
 ## Development
 
-Run tests:
+Run backend tests:
 
 ```bash
 uv run pytest tests/
 ```
 
-Format and type check:
+Run frontend tests:
+
+```bash
+cd web && npm run test:run
+```
+
+Format and type check (backend):
 
 ```bash
 uv run black src/
 uv run mypy src/
 ```
 
+Type check (frontend):
+
+```bash
+cd web && npx tsc --noEmit
+```
+
+For CLI and direct API server usage, see [docs/cli-reference.md](docs/cli-reference.md).
+
 ## Architecture Overview
+
+The frontend (`web/`) is a React + Vite SPA that talks exclusively to the FastAPI backend through a typed API client. The Vite dev server proxies `/api/*` requests to `http://localhost:8000`, so the frontend never needs to know the backend's address directly.
 
 ### State Management
 
 - Session state is persisted in `src/state/state.json`
 - State includes profile, preferences, generated meals, grocery items, and inventory
-- State is automatically updated after each operation
+- The frontend uses TanStack Query for server-state caching and invalidation
 
 ### Generation Pipeline
 
@@ -327,36 +209,33 @@ uv run mypy src/
 
 ```text
 meal-planner/
-|-- README.md
-|-- IMPLEMENTATION_SUMMARY.md
-|-- pyproject.toml
-|-- requirements.txt
-|-- LICENSE
-|-- main.py
-|-- src/
-|   |-- api/
-|   |   |-- main.py
-|   |   `-- endpoints/
-|   |-- data/
-|   |   |-- food.csv
-|   |   |-- specialty-ingredients.md
-|   |   |-- meal-recipes.md
-|   |   |-- rules.md
-|   |   `-- user_stats.csv
-|   |-- state/
-|   |   `-- state.json
-|   |-- tools/
-|   |   |-- generate_plan.py
-|   |   |-- calculate_tdee.py
-|   |   |-- update_state.py
-|   |   |-- confidence.py
-|   |   |-- llm_agent.py
-|   |   |-- food_processor.py
-|   |   |-- grocery_inventory.py
-|   |   `-- add_saved_meal.py
-|   `-- server.py
-|-- tests/
-`-- plan/
+├── README.md
+├── docs/
+│   └── cli-reference.md     # CLI and direct API server usage
+├── pyproject.toml
+├── requirements.txt
+├── main.py                  # Command CLI entry point
+├── src/
+│   ├── api/
+│   │   ├── main.py
+│   │   └── endpoints/
+│   ├── data/
+│   │   ├── food.csv
+│   │   ├── specialty-ingredients.md
+│   │   ├── meal-recipes.md
+│   │   ├── rules.md
+│   │   └── user_stats.csv
+│   ├── state/
+│   │   └── state.json
+│   ├── tools/
+│   └── server.py            # Interactive CLI entry point
+├── web/                     # React frontend
+│   ├── src/
+│   │   ├── api/             # Typed API client
+│   │   ├── features/        # plan, meals, groceries, state
+│   │   └── components/      # Shared UI components
+│   └── package.json
+└── tests/
 ```
 
 ## License
