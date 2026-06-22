@@ -29,7 +29,7 @@ async def add_groceries(request: GroceriesRequest):
                 confidence_level=meta.get("confidence_level", ""),
                 status=status,
             ))
-            if meta.get("should_auto_save") and meta.get("source") == "corgis":
+            if meta.get("should_auto_save"):
                 to_save.append(meta)
             else:
                 unmatched.append(meta)
