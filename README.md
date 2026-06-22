@@ -48,15 +48,6 @@ cd web && npm install && cd ..
 
 **Backend** — copy the example and fill in your keys:
 
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
-```
-
-macOS/Linux:
-
 ```bash
 cp .env.example .env
 nano .env
@@ -73,14 +64,6 @@ GEMINI_API_KEY=your-gemini-api-key-here
 - `GEMINI_API_KEY` — used for LLM-backed grocery parsing. Create one at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
 **Frontend** — copy the web example:
-
-PowerShell:
-
-```powershell
-Copy-Item web\.env.example web\.env
-```
-
-macOS/Linux:
 
 ```bash
 cp web/.env.example web/.env
