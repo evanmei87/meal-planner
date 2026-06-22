@@ -103,15 +103,58 @@ def test_update_state_failure(client, api_key_headers, temp_state_file):
         'missing_macros': []
     }
     Path(temp_state_file).write_text(json.dumps(initial_state))
-    
+
     with patch('src.api.endpoints.state.STATE_PATH', temp_state_file):
         with patch('src.api.endpoints.state.update_state') as mock_update:
             mock_update.return_value = False
-            
+
             response = client.put(
                 "/state/",
                 json={"current_day": "Tuesday"},
                 headers=api_key_headers
             )
-            
+
             assert response.status_code == 500
+
+
+def test_get_state_returns_preferences(client, api_key_headers, temp_state_file):
+    """GET /state/ includes the preferences field when present in state."""
+    state_data = {
+        'current_day': 'Monday',
+        'plan_id': 'test-plan-123',
+        'plan': [],
+        'grocery_list': [],
+        'missing_macros': [],
+        'preferences': 'high protein, no red meat',
+    }
+    Path(temp_state_file).write_text(json.dumps(state_data))
+
+    with patch('src.api.endpoints.state.STATE_PATH', temp_state_file):
+        response = client.get('/state/', headers=api_key_headers)
+
+    assert response.status_code == 200
+    assert response.json()['preferences'] == 'high protein, no red meat'
+
+
+def test_update_state_persists_preferences(client, api_key_headers, temp_state_file):
+    """PUT /state/ with preferences merges it into state and returns it."""
+    initial_state = {
+        'current_day': 'Monday',
+        'plan_id': 'test-plan-123',
+        'plan': [],
+        'grocery_list': [],
+        'missing_macros': [],
+    }
+    Path(temp_state_file).write_text(json.dumps(initial_state))
+
+    with patch('src.api.endpoints.state.STATE_PATH', temp_state_file):
+        with patch('src.api.endpoints.state.update_state') as mock_update:
+            mock_update.return_value = True
+            response = client.put(
+                '/state/',
+                json={'preferences': 'vegetarian lunches'},
+                headers=api_key_headers,
+            )
+
+    assert response.status_code == 200
+    assert response.json()['preferences'] == 'vegetarian lunches'

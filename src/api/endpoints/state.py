@@ -13,12 +13,13 @@ STATE_PATH = Path(__file__).parent.parent.parent / 'state' / 'state.json'
 async def get_state():
     """
     Get the current application state.
-    
+
     Returns:
-        StateResponse with current day, plan ID, plan, grocery list, and missing macros
-    
+        StateResponse with current day, plan ID, plan, grocery list, missing macros,
+        and preferences string.
+
     Example:
-        GET /state
+        GET /state/
     """
     try:
         import json
@@ -45,7 +46,8 @@ async def get_state():
             missing_macros=state.get('missing_macros', []),
             grocery_inventory=state.get('grocery_inventory', []),
             unmatched_groceries=state.get('unmatched_groceries', []),
-            inventory_usage=state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []})
+            inventory_usage=state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []}),
+            preferences=state.get('preferences'),
         )
     except HTTPException:
         raise
@@ -57,19 +59,18 @@ async def get_state():
 async def update_state_endpoint(request: UpdateStateRequest):
     """
     Update the application state with new plan data.
-    
+
     Args:
-        request: UpdateStateRequest with optional plan, grocery_list, missing_macros, and current_day
-    
+        request: UpdateStateRequest with optional plan, grocery_list, missing_macros,
+                 current_day, and preferences string.
+
     Returns:
-        StateResponse with updated state
-    
+        StateResponse with updated state.
+
     Example:
-        PUT /state
+        PUT /state/
         {
-            "current_day": "Tuesday",
-            "plan": [...],
-            "grocery_list": [...]
+            "preferences": "high protein, no red meat"
         }
     """
     try:
@@ -107,6 +108,8 @@ async def update_state_endpoint(request: UpdateStateRequest):
             update_data['unmatched_groceries'] = request.unmatched_groceries
         if request.inventory_usage is not None:
             update_data['inventory_usage'] = request.inventory_usage
+        if request.preferences is not None:
+            update_data['preferences'] = request.preferences
 
         # Update state using the tool
         success = update_state(str(state_path), update_data)
@@ -125,7 +128,8 @@ async def update_state_endpoint(request: UpdateStateRequest):
             missing_macros=merged_state.get('missing_macros', []),
             grocery_inventory=merged_state.get('grocery_inventory', []),
             unmatched_groceries=merged_state.get('unmatched_groceries', []),
-            inventory_usage=merged_state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []})
+            inventory_usage=merged_state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []}),
+            preferences=merged_state.get('preferences'),
         )
     except HTTPException:
         raise
