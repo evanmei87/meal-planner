@@ -101,4 +101,5 @@ export interface AppState {
   grocery_inventory: Record<string, unknown>[]
   unmatched_groceries: Record<string, unknown>[]
   inventory_usage: { used: string[]; unused: string[]; supplemental: string[] }
+  preferences?: string
 }

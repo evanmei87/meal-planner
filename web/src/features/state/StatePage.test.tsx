@@ -1,10 +1,16 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
+import { api } from '../../api/client'
 import { StatePage } from './StatePage'
+
+function PlanObserver() {
+  useQuery({ queryKey: ['plan'], queryFn: api.plan.get })
+  return null
+}
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -53,5 +59,119 @@ describe('StatePage', () => {
     server.use(http.get('http://localhost/api/state/', () => HttpResponse.json(STATE)))
     renderStatePage()
     await screen.findByText('saffron')
+  })
+
+  it('renders preferences input pre-filled from stored state', async () => {
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, preferences: 'high protein' })
+      )
+    )
+    renderStatePage()
+    const input = await screen.findByPlaceholderText(/e\.g\. no red meat/i)
+    expect(input).toHaveValue('high protein')
+  })
+
+  it('Save button calls PUT /state/ with the current preferences value', async () => {
+    let putBody: unknown = null
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, preferences: 'vegetarian' })
+      ),
+      http.put('http://localhost/api/state/', async ({ request }) => {
+        putBody = await request.json()
+        return HttpResponse.json({ ...STATE, preferences: 'vegetarian' })
+      })
+    )
+    renderStatePage()
+    await screen.findByPlaceholderText(/e\.g\. no red meat/i)
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(putBody).toMatchObject({ preferences: 'vegetarian' }))
+  })
+
+  it('shows Regenerate Plan button when plan_id is non-empty', async () => {
+    server.use(
+      http.get('http://localhost/api/state/', () => HttpResponse.json({ ...STATE, plan_id: 'abc-123' }))
+    )
+    renderStatePage()
+    await screen.findByRole('button', { name: /regenerate plan/i })
+  })
+
+  it('hides Regenerate Plan button when plan_id is empty', async () => {
+    server.use(
+      http.get('http://localhost/api/state/', () => HttpResponse.json({ ...STATE, plan_id: '' }))
+    )
+    renderStatePage()
+    await screen.findByText('Wednesday')
+    expect(screen.queryByRole('button', { name: /regenerate plan/i })).not.toBeInTheDocument()
+  })
+
+  it('Regenerate Plan button calls POST /plan/generate with stored preferences', async () => {
+    let generateBody: unknown = null
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, plan_id: 'abc-123', preferences: 'high protein' })
+      ),
+      http.post('http://localhost/api/plan/generate', async ({ request }) => {
+        generateBody = await request.json()
+        return HttpResponse.json({
+          plan_id: 'abc-123',
+          plan: [],
+          grocery_list: [],
+          status: 'success',
+        })
+      })
+    )
+    renderStatePage()
+    fireEvent.click(await screen.findByRole('button', { name: /regenerate plan/i }))
+    await waitFor(() => expect(generateBody).toMatchObject({ preferences: 'high protein' }))
+  })
+
+  it('Regenerate Plan invalidates both state and plan queries', async () => {
+    let planFetched = false
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, plan_id: 'abc-123', preferences: 'high protein' })
+      ),
+      http.post('http://localhost/api/plan/generate', async () =>
+        HttpResponse.json({ plan_id: 'abc-123', plan: [], grocery_list: [], status: 'success' })
+      ),
+      http.get('http://localhost/api/plan/', () => {
+        planFetched = true
+        return HttpResponse.json({ plan_id: 'abc-123', plan: [], grocery_list: [], status: 'success' })
+      })
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <PlanObserver />
+          <StatePage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    // Wait for the initial plan fetch to complete before triggering regenerate
+    await waitFor(() => expect(planFetched).toBe(true))
+    planFetched = false
+    fireEvent.click(await screen.findByRole('button', { name: /regenerate plan/i }))
+    await waitFor(() => expect(planFetched).toBe(true))
+  })
+
+  it('Save with empty input sends preferences as empty string', async () => {
+    let putBody: unknown = null
+    server.use(
+      http.get('http://localhost/api/state/', () =>
+        HttpResponse.json({ ...STATE, preferences: 'high protein' })
+      ),
+      http.put('http://localhost/api/state/', async ({ request }) => {
+        putBody = await request.json()
+        return HttpResponse.json({ ...STATE, preferences: '' })
+      })
+    )
+    renderStatePage()
+    const input = await screen.findByPlaceholderText(/e\.g\. no red meat/i)
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(putBody).toMatchObject({ preferences: '' }))
   })
 })
