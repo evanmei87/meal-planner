@@ -140,6 +140,14 @@ def test_generate_meal_plan_from_request_respects_state_preferences(tmp_path, mo
     assert not any('salmon' in name.lower() for name in all_meal_names)
 
 
+def test_generate_day_plan_fallback_respects_preferences():
+    state = {'preferences': 'no salmon'}
+    updates = {'ate_out': False, 'extra_items': [], 'removed_items': []}
+    day = generate_day_plan(2250.0, 'Monday', state, {}, updates, candidates=[])
+    meal_names = [m['name'] for m in day['meals']]
+    assert not any('salmon' in name.lower() for name in meal_names)
+
+
 def test_update_plan_in_state():
     state = {
         'plan': [],
