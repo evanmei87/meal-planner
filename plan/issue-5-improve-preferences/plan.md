@@ -1,5 +1,7 @@
 # Preferences UI Implementation Plan
 
+GitHub Issue: https://github.com/evanmei87/meal-planner/issues/5
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Persist meal-plan preferences in app state so they survive page reloads, pre-fill the Plan page input, and are viewable/editable on the State page with a Regenerate Plan button.
