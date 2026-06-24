@@ -241,6 +241,28 @@ def _inventory_lookup_key(name: str) -> str:
     return name.lower().strip()
 
 
+def _excluded_terms(preferences: str) -> list[str]:
+    """Extract excluded ingredient/meal terms from a preferences string.
+
+    Parses comma-separated phrases of the form "no X" and returns [X, ...].
+    Other phrases (e.g. "high protein") are ignored.
+    """
+    excluded = []
+    for phrase in preferences.lower().split(','):
+        phrase = phrase.strip()
+        if phrase.startswith('no '):
+            excluded.append(phrase[3:].strip())
+    return excluded
+
+
+def _meal_allowed(meal: dict, excluded: list[str]) -> bool:
+    """Return True if no excluded term appears in the meal name or ingredients."""
+    if not excluded:
+        return True
+    meal_text = (meal.get('name', '') + ' ' + ' '.join(meal.get('ingredients', []))).lower()
+    return not any(term.lower() in meal_text for term in excluded)
+
+
 def _build_candidate_meals(state: dict, inventory: list[dict]) -> list[dict]:
     hardcoded = []
     for slot in _CORE_SLOTS:
@@ -259,6 +281,10 @@ def _build_candidate_meals(state: dict, inventory: list[dict]) -> list[dict]:
                 "ingredients": meal.get("ingredients", []),
                 "category": meal.get("category", ""),
             })
+
+    preferences = state.get('preferences', '') or ''
+    excluded = _excluded_terms(preferences)
+    combined = [m for m in combined if _meal_allowed(m, excluded)]
 
     inventory_names = {_inventory_lookup_key(i.get("standardized_item", i.get("raw_phrase", ""))) for i in inventory}
 

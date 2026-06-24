@@ -12,7 +12,10 @@ from tools.generate_plan import (
     get_next_day,
     parse_user_updates,
     generate_day_plan,
-    update_plan_in_state
+    update_plan_in_state,
+    _excluded_terms,
+    _meal_allowed,
+    generate_meal_plan_from_request,
 )
 
 def test_load_state_default(tmp_path):
@@ -79,6 +82,63 @@ def test_generate_day_plan():
     plan_monday = generate_day_plan(2500, 'Monday', state, static_data, updates)
     assert plan_monday['day'] == 'Monday'
     assert plan_monday['total_calories'] <= 2250
+
+def test_excluded_terms_parses_no_phrases():
+    assert _excluded_terms('no salmon, no chicken') == ['salmon', 'chicken']
+
+
+def test_excluded_terms_ignores_non_no_phrases():
+    assert _excluded_terms('high protein, no red meat') == ['red meat']
+
+
+def test_excluded_terms_empty():
+    assert _excluded_terms('') == []
+
+
+def test_meal_allowed_passes_when_no_exclusions():
+    meal = {'name': 'Salmon Rice Bowl', 'ingredients': ['Salmon', 'Rice']}
+    assert _meal_allowed(meal, []) is True
+
+
+def test_meal_allowed_filters_by_name():
+    meal = {'name': 'Salmon Rice Bowl', 'ingredients': ['Salmon', 'Rice']}
+    assert _meal_allowed(meal, ['salmon']) is False
+
+
+def test_meal_allowed_filters_by_ingredient():
+    meal = {'name': 'Rice Bowl', 'ingredients': ['Salmon', 'Rice']}
+    assert _meal_allowed(meal, ['salmon']) is False
+
+
+def test_meal_allowed_case_insensitive():
+    meal = {'name': 'Salmon Rice Bowl', 'ingredients': ['Salmon', 'Rice']}
+    assert _meal_allowed(meal, ['Salmon']) is False
+
+
+def test_generate_meal_plan_from_request_respects_state_preferences(tmp_path, monkeypatch):
+    """Meals matching state.preferences exclusions must not appear in the plan."""
+    state = {
+        'current_day': 'Monday',
+        'plan_id': 'test-id',
+        'plan': [],
+        'grocery_list': [],
+        'missing_macros': [],
+        'grocery_inventory': [],
+        'unmatched_groceries': [],
+        'inventory_usage': {'used': [], 'unused': [], 'supplemental': []},
+        'preferences': 'no salmon',
+    }
+    state_file = tmp_path / 'state.json'
+    state_file.write_text(json.dumps(state))
+
+    monkeypatch.setattr('tools.generate_plan.get_inventory', lambda: [])
+    monkeypatch.setattr('tools.generate_plan.load_saved_meals', lambda: [])
+
+    result = generate_meal_plan_from_request(str(state_file), {'days': ['Monday']})
+
+    all_meal_names = [m['name'] for day in result['plan'] for m in day['meals']]
+    assert not any('salmon' in name.lower() for name in all_meal_names)
+
 
 def test_update_plan_in_state():
     state = {
