@@ -282,8 +282,12 @@ def _build_candidate_meals(state: dict, inventory: list[dict]) -> list[dict]:
                 "category": meal.get("category", ""),
             })
 
-    preferences = state.get('preferences', '') or ''
-    excluded = _excluded_terms(preferences)
+    normalized = state.get('normalized_exclusions')
+    if normalized is not None:
+        excluded = [t.lower() for t in normalized]
+    else:
+        preferences = state.get('preferences', '') or ''
+        excluded = _excluded_terms(preferences)
     combined = [m for m in combined if _meal_allowed(m, excluded)]
 
     inventory_names = {_inventory_lookup_key(i.get("standardized_item", i.get("raw_phrase", ""))) for i in inventory}
@@ -333,13 +337,21 @@ def generate_day_plan(tdee: float, day_name: str, state: dict, static_data: dict
             day_meals.append(meal)
             seen.add(name)
             needed_calories -= meal_cals
-        preferences = state.get('preferences', '') or ''
-        excluded = _excluded_terms(preferences)
+        normalized = state.get('normalized_exclusions')
+        if normalized is not None:
+            excluded = [t.lower() for t in normalized]
+        else:
+            preferences = state.get('preferences', '') or ''
+            excluded = _excluded_terms(preferences)
         fallback = _fallback_day_meals(day_index, target_calories)
         meals = day_meals if day_meals else [m for m in fallback if _meal_allowed(m, excluded)]
     else:
-        preferences = state.get('preferences', '') or ''
-        excluded = _excluded_terms(preferences)
+        normalized = state.get('normalized_exclusions')
+        if normalized is not None:
+            excluded = [t.lower() for t in normalized]
+        else:
+            preferences = state.get('preferences', '') or ''
+            excluded = _excluded_terms(preferences)
         fallback = _fallback_day_meals(day_index, target_calories)
         meals = [m for m in fallback if _meal_allowed(m, excluded)]
 

@@ -148,6 +148,37 @@ def test_generate_day_plan_fallback_respects_preferences():
     assert not any('salmon' in name.lower() for name in meal_names)
 
 
+def test_generate_plan_uses_normalized_exclusions_over_keyword_parse(tmp_path, monkeypatch):
+    """normalized_exclusions takes priority over keyword-parsing state.preferences."""
+    import json
+    from tools.generate_plan import generate_meal_plan_from_request
+
+    state = {
+        'current_day': 'Monday',
+        'plan_id': 'test-id',
+        'plan': [],
+        'grocery_list': [],
+        'missing_macros': [],
+        'grocery_inventory': [],
+        'unmatched_groceries': [],
+        'inventory_usage': {'used': [], 'unused': [], 'supplemental': []},
+        'preferences': 'ignore this',
+        # normalized list explicitly excludes salmon
+        'normalized_exclusions': ['salmon', 'salmon rice bowl', 'salmon quinoa bowl',
+                                   'salmon with quinoa and spinach'],
+    }
+    state_file = tmp_path / 'state.json'
+    state_file.write_text(json.dumps(state))
+
+    monkeypatch.setattr('tools.generate_plan.get_inventory', lambda: [])
+    monkeypatch.setattr('tools.generate_plan.load_saved_meals', lambda: [])
+
+    result = generate_meal_plan_from_request(str(state_file), {'days': ['Monday']})
+
+    all_meal_names = [m['name'] for day in result['plan'] for m in day['meals']]
+    assert not any('salmon' in name.lower() for name in all_meal_names)
+
+
 def test_update_plan_in_state():
     state = {
         'plan': [],
