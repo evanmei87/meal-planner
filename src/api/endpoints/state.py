@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 
 from src.api.models import StateResponse, UpdateStateRequest
+from src.tools.preference_normalizer import normalize_preferences
 from src.tools.update_state import update_state
 
 router = APIRouter(prefix="/state", tags=["State"])
@@ -35,6 +36,7 @@ async def get_state():
                 unmatched_groceries=[],
                 inventory_usage={"used": [], "unused": [], "supplemental": []},
                 preferences=None,
+                normalized_exclusions=None,
             )
 
         state = json.loads(state_path.read_text())
@@ -49,6 +51,7 @@ async def get_state():
             unmatched_groceries=state.get('unmatched_groceries', []),
             inventory_usage=state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []}),
             preferences=state.get('preferences'),
+            normalized_exclusions=state.get('normalized_exclusions'),
         )
     except HTTPException:
         raise
@@ -111,6 +114,7 @@ async def update_state_endpoint(request: UpdateStateRequest):
             update_data['inventory_usage'] = request.inventory_usage
         if request.preferences is not None:
             update_data['preferences'] = request.preferences
+            update_data['normalized_exclusions'] = normalize_preferences(request.preferences)
 
         # Update state using the tool
         success = update_state(str(state_path), update_data)
@@ -131,6 +135,7 @@ async def update_state_endpoint(request: UpdateStateRequest):
             unmatched_groceries=merged_state.get('unmatched_groceries', []),
             inventory_usage=merged_state.get('inventory_usage', {"used": [], "unused": [], "supplemental": []}),
             preferences=merged_state.get('preferences'),
+            normalized_exclusions=merged_state.get('normalized_exclusions'),
         )
     except HTTPException:
         raise
