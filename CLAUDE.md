@@ -92,3 +92,5 @@ Preference normalization only fires on explicit Save, so a typical session makes
 ## Planning
 
 Plans go in `/plan/issue-{number}-{feature-name}/plan.md`. Use `0` when no GitHub issue exists. Include a link to the originating GitHub issue near the top of every plan file.
+
+Plan files are always committed to git. When creating a PR, stage and commit all files under `plan/` before pushing.
