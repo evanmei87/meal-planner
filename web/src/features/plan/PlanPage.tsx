@@ -42,16 +42,12 @@ export function PlanPage() {
 
   const currentDayPlan = days.find((d) => d.day === selectedDay) ?? days[0]
 
-  function handleGenerate() {
-    generate.mutate(
-      { preferences: preferences || undefined },
-      {
-        onSuccess: async () => {
-          await api.state.update({ preferences: preferences || undefined })
-          qc.invalidateQueries({ queryKey: ['state'] })
-        },
-      }
-    )
+  async function handleGenerate() {
+    if (preferences) {
+      await api.state.update({ preferences })
+      qc.invalidateQueries({ queryKey: ['state'] })
+    }
+    generate.mutate({ preferences: preferences || undefined })
   }
 
   return (

@@ -42,6 +42,10 @@ def update_state(state_path: str, updated_plan: dict) -> bool:
             existing_state['unmatched_groceries'] = updated_plan['unmatched_groceries']
         if 'inventory_usage' in updated_plan:
             existing_state['inventory_usage'] = updated_plan['inventory_usage']
+        if 'preferences' in updated_plan:
+            existing_state['preferences'] = updated_plan['preferences']
+        if 'normalized_exclusions' in updated_plan:
+            existing_state['normalized_exclusions'] = updated_plan['normalized_exclusions']
 
         # Save updated state
         state_file.write_text(json.dumps(existing_state, indent=2))

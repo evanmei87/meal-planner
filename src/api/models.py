@@ -118,6 +118,7 @@ class StateResponse(BaseModel):
     unmatched_groceries: List[dict] = Field(default_factory=list)
     inventory_usage: dict = Field(default_factory=lambda: {"used": [], "unused": [], "supplemental": []})
     preferences: Optional[str] = None
+    normalized_exclusions: Optional[List[str]] = None
 
 
 class UpdateStateRequest(BaseModel):
@@ -130,6 +131,7 @@ class UpdateStateRequest(BaseModel):
     unmatched_groceries: Optional[List[dict]] = None
     inventory_usage: Optional[dict] = None
     preferences: Optional[str] = None
+    normalized_exclusions: Optional[List[str]] = None
 
 
 class ErrorResponse(BaseModel):

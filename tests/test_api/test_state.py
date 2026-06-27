@@ -149,16 +149,18 @@ def test_update_state_persists_preferences(client, api_key_headers, temp_state_f
 
     with patch('src.api.endpoints.state.STATE_PATH', temp_state_file):
         with patch('src.api.endpoints.state.update_state') as mock_update:
-            mock_update.return_value = True
-            response = client.put(
-                '/state/',
-                json={'preferences': 'vegetarian lunches'},
-                headers=api_key_headers,
-            )
+            with patch('src.api.endpoints.state.normalize_preferences', return_value=[]) as mock_normalize:
+                mock_update.return_value = True
+                response = client.put(
+                    '/state/',
+                    json={'preferences': 'vegetarian lunches'},
+                    headers=api_key_headers,
+                )
 
     assert response.status_code == 200
     assert response.json()['preferences'] == 'vegetarian lunches'
+    mock_normalize.assert_called_once_with('vegetarian lunches')
     mock_update.assert_called_once_with(
         str(temp_state_file),
-        {'preferences': 'vegetarian lunches'}
+        {'preferences': 'vegetarian lunches', 'normalized_exclusions': []}
     )

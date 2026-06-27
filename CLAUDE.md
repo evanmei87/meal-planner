@@ -62,6 +62,35 @@ Frontend files live exclusively under `web/` — never add them to the Python `s
 5. Compute supplemental grocery list (ingredients not covered by inventory)
 6. Persist updated state
 
+## External APIs
+
+### Gemini API (Google AI)
+
+Used for:
+- **Grocery parsing** (`src/tools/food_processor.py` + `src/tools/llm_agent.py`)
+- **Preference normalization** (`src/tools/preference_normalizer.py`) — called once when user saves preferences
+
+**Setup:** Set `GEMINI_API_KEY` in a `.env` file at the project root. The key is read by `_read_env_file_api_key()` in `src/tools/llm_agent.py`.
+
+```
+GEMINI_API_KEY=your-key-here
+```
+
+**Model:** `gemini-2.5-flash-lite` (configured as `DEFAULT_MODEL` in `llm_agent.py`).
+
+**Free tier:** Available at [ai.google.dev](https://ai.google.dev). Google does not publish static rate-limit numbers — check your current limits in [AI Studio → Rate Limits](https://aistudio.google.com/rate-limit). As of mid-2026 the free tier supports on the order of tens of requests per minute and hundreds to low thousands per day for Flash-class models. See [pricing page](https://ai.google.dev/gemini-api/docs/pricing) for input/output token costs on paid tier.
+
+**Calls per user action:**
+| Action | Gemini calls |
+|--------|-------------|
+| Save preferences (PUT /state/) | 1 — preference normalization |
+| Parse groceries (POST /groceries/) | 1 per parse request |
+| Regenerate plan (POST /plan/generate) | 0 |
+
+Preference normalization only fires on explicit Save, so a typical session makes 1–3 Gemini calls total. The free tier is more than sufficient for personal or development use. If the API key is missing or the call fails, preference normalization falls back to simple keyword matching — the app stays functional.
+
 ## Planning
 
 Plans go in `/plan/issue-{number}-{feature-name}/plan.md`. Use `0` when no GitHub issue exists. Include a link to the originating GitHub issue near the top of every plan file.
+
+Plan files are always committed to git. When creating a PR, stage and commit all files under `plan/` before pushing.
