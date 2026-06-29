@@ -21,6 +21,17 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    /* Exercise-type palette — consumed by #38 via cva. Strong = border, subtle = background. */
+    --color-exercise-running: var(--color-green-600);
+    --color-exercise-running-subtle: var(--color-green-50);
+    --color-exercise-walking: var(--color-blue-500);
+    --color-exercise-walking-subtle: var(--color-blue-50);
+    --color-exercise-biking: var(--color-orange-500);
+    --color-exercise-biking-subtle: var(--color-orange-50);
+    --color-exercise-swimming: var(--color-cyan-500);
+    --color-exercise-swimming-subtle: var(--color-cyan-50);
+    --color-exercise-strength: var(--color-purple-500);
+    --color-exercise-strength-subtle: var(--color-purple-50);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
