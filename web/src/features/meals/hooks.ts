@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api/client'
-import type { AddMealRequest, SearchParams } from '../../api/types'
+import { api } from '@/api/client'
+import type { AddMealRequest, SearchParams } from '@/api/types'
 
 export function useMeals() {
   return useQuery({ queryKey: ['meals'], queryFn: () => api.meals.list() })

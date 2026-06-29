@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 export function App() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
+      <nav className="bg-white shadow-xs sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex gap-6 text-sm font-medium">
           <NavLink
             to="/plan"

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api/client'
-import type { AppState } from '../../api/types'
+import { api } from '@/api/client'
+import type { AppState } from '@/api/types'
 
 export function useAppState() {
   return useQuery({ queryKey: ['state'], queryFn: api.state.get })

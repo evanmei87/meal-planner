@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ApiError } from '../../api/client'
-import { ErrorBanner } from '../../components/ErrorBanner'
-import { Spinner } from '../../components/Spinner'
-import { Table } from '../../components/Table'
-import { useAppState } from '../state/hooks'
-import type { GroceryParseResult } from '../../api/types'
-import { useAddGroceries } from './hooks'
+import { ApiError } from '@/api/client'
+import { ErrorBanner } from '@/components/ErrorBanner'
+import { Spinner } from '@/components/Spinner'
+import { Table } from '@/components/Table'
+import { useAppState } from '@/features/state/hooks'
+import type { GroceryParseResult } from '@/api/types'
+import { useAddGroceries } from '@/features/groceries/hooks'
 
 export function GroceriesPage() {
   const [text, setText] = useState('')

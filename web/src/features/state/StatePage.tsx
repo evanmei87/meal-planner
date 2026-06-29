@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ApiError } from '../../api/client'
-import { ErrorBanner } from '../../components/ErrorBanner'
-import { Spinner } from '../../components/Spinner'
-import { Table } from '../../components/Table'
-import { useGeneratePlan } from '../plan/hooks'
-import { useAppState, useUpdateState } from './hooks'
+import { ApiError } from '@/api/client'
+import { ErrorBanner } from '@/components/ErrorBanner'
+import { Spinner } from '@/components/Spinner'
+import { Table } from '@/components/Table'
+import { useGeneratePlan } from '@/features/plan/hooks'
+import { useAppState, useUpdateState } from '@/features/state/hooks'
 
 export function StatePage() {
   const { data: state, isLoading, isError, error } = useAppState()
