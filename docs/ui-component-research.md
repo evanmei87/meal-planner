@@ -13,7 +13,7 @@ This effort is research + decision + an adoption plan only. It deliberately stop
 
 ## 1. Premise correction: this is a React-only codebase
 
-Issue #10 frames the evaluation around a frontend "ecosystem [that] involves both React and Vue." The repository does not match that premise. `web/package.json` declares React 18, `react-router-dom`, `@tanstack/react-query`, and **Tailwind CSS 3**, built with Vite and tested with Vitest. There is no Vue anywhere in the tree, and both `CLAUDE.md` and the existing exercise issues (#28) describe a single React + TypeScript SPA.
+Issue #10 frames the evaluation around a frontend "ecosystem [that] involves both React and Vue." The repository does not match that premise. `web/package.json` declares React 18, `react-router-dom`, `@tanstack/react-query`, and **Tailwind CSS 4**, built with Vite and tested with Vitest. There is no Vue anywhere in the tree, and both `CLAUDE.md` and the existing exercise issues (#28) describe a single React + TypeScript SPA.
 
 Consequence: the decisive evaluation axis is **React + Tailwind fit**, not framework-agnosticism. Web Components and "wrappers for both React and Vue" — emphasized in the original ticket — are not requirements. This correction materially narrows and clarifies the field.
 
@@ -33,7 +33,7 @@ Accessibility is valued but was not ranked as the headline priority; it is treat
 Per #10's acceptance criteria, each kit below is assessed on:
 
 - **Overview** — design aesthetic and philosophy.
-- **React + Tailwind fit** — how cleanly it integrates with our React 18 + Tailwind 3 stack (this replaces the original "React and Vue compatibility" dimension, per §1).
+- **React + Tailwind fit** — how cleanly it integrates with our React 18 + Tailwind 4 stack (this replaces the original "React and Vue compatibility" dimension, per §1).
 - **Customizability** — how easy it is to theme or override styles.
 - **Accessibility (a11y)** — out-of-the-box keyboard nav, ARIA, screen-reader support.
 - **Licensing / Cost** — open-source vs premium.
