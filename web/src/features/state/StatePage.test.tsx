@@ -4,8 +4,8 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { api } from '../../api/client'
-import { StatePage } from './StatePage'
+import { api } from '@/api/client'
+import { StatePage } from '@/features/state/StatePage'
 
 function PlanObserver() {
   useQuery({ queryKey: ['plan'], queryFn: api.plan.get })

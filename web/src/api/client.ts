@@ -7,7 +7,7 @@ import type {
   MealPlanResponse,
   MealResponse,
   SearchParams,
-} from './types'
+} from '@/api/types'
 
 const BASE = '/api'
 

@@ -1,10 +1,10 @@
 import { useLocation, useParams } from 'react-router-dom'
-import { ApiError } from '../../api/client'
-import { Card } from '../../components/Card'
-import { ErrorBanner } from '../../components/ErrorBanner'
-import { Spinner } from '../../components/Spinner'
-import type { MealItem } from '../../api/types'
-import { useMeals } from './hooks'
+import { ApiError } from '@/api/client'
+import { Card } from '@/components/Card'
+import { ErrorBanner } from '@/components/ErrorBanner'
+import { Spinner } from '@/components/Spinner'
+import type { MealItem } from '@/api/types'
+import { useMeals } from '@/features/meals/hooks'
 
 export function MealDetailPage() {
   const { name } = useParams<{ name: string }>()

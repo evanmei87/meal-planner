@@ -4,8 +4,8 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { MealDetailPage } from './MealDetailPage'
-import type { MealItem } from '../../api/types'
+import { MealDetailPage } from '@/features/meals/MealDetailPage'
+import type { MealItem } from '@/api/types'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))

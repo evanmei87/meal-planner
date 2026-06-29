@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { api, ApiError } from '../../api/client'
-import { Card } from '../../components/Card'
-import { ErrorBanner } from '../../components/ErrorBanner'
-import { Spinner } from '../../components/Spinner'
-import { useAppState } from '../state/hooks'
-import { usePlan, useGeneratePlan } from './hooks'
+import { api, ApiError } from '@/api/client'
+import { Card } from '@/components/Card'
+import { ErrorBanner } from '@/components/ErrorBanner'
+import { Spinner } from '@/components/Spinner'
+import { useAppState } from '@/features/state/hooks'
+import { usePlan, useGeneratePlan } from '@/features/plan/hooks'
 
 export function PlanPage() {
   const { data: planData, isLoading, isError, error } = usePlan()

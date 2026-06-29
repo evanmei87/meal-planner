@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ErrorBanner } from '../../components/ErrorBanner'
-import { Spinner } from '../../components/Spinner'
-import { Table } from '../../components/Table'
-import type { AddMealRequest, SearchParams } from '../../api/types'
-import { ApiError } from '../../api/client'
-import { useSearchMeals, useAddMeal } from './hooks'
+import { ErrorBanner } from '@/components/ErrorBanner'
+import { Spinner } from '@/components/Spinner'
+import { Table } from '@/components/Table'
+import type { AddMealRequest, SearchParams } from '@/api/types'
+import { ApiError } from '@/api/client'
+import { useSearchMeals, useAddMeal } from '@/features/meals/hooks'
 
 export function MealsPage() {
   const [filters, setFilters] = useState<SearchParams>({})
