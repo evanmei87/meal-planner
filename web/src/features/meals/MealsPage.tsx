@@ -17,7 +17,7 @@ export function MealsPage() {
 
   const [form, setForm] = useState({
     name: '', ingredients: '', calories: '', protein: '', carbs: '', fat: '',
-    instructions: '', category: 'Dinner', tags: '',
+    instructions: '', category: 'Dinner', servings: '1', tags: '',
   })
 
   const handleSearch = () => {
@@ -37,12 +37,13 @@ export function MealsPage() {
       },
       instructions: form.instructions.split(';').map((s) => s.trim()).filter(Boolean),
       category: form.category,
+      servings: parseInt(form.servings) || 1,
       tags: form.tags.split(',').map((s) => s.trim()).filter(Boolean),
     }
     addMeal.mutate(req, {
       onSuccess: () => {
         setShowAdd(false)
-        setForm({ name: '', ingredients: '', calories: '', protein: '', carbs: '', fat: '', instructions: '', category: 'Dinner', tags: '' })
+        setForm({ name: '', ingredients: '', calories: '', protein: '', carbs: '', fat: '', instructions: '', category: 'Dinner', servings: '1', tags: '' })
       },
     })
   }
@@ -84,8 +85,8 @@ export function MealsPage() {
             <input id="meal-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Ingredients (comma-separated)</label>
-            <input value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+            <label htmlFor="meal-ingredients" className="block text-sm text-gray-600 mb-1">Ingredients (comma-separated)</label>
+            <input id="meal-ingredients" value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
           <div className="grid grid-cols-4 gap-2">
             {(['calories', 'protein', 'carbs', 'fat'] as const).map((macro) => (
@@ -96,15 +97,19 @@ export function MealsPage() {
             ))}
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Instructions (semicolon-separated)</label>
-            <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+            <label htmlFor="meal-instructions" className="block text-sm text-gray-600 mb-1">Instructions (semicolon-separated)</label>
+            <textarea id="meal-instructions" value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-sm text-gray-600 mb-1">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                 {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((c) => <option key={c}>{c}</option>)}
               </select>
+            </div>
+            <div>
+              <label htmlFor="meal-servings" className="block text-sm text-gray-600 mb-1">Servings</label>
+              <input id="meal-servings" type="number" min="1" value={form.servings} onChange={(e) => setForm({ ...form, servings: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Tags (comma-separated)</label>

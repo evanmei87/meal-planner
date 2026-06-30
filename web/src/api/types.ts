@@ -50,6 +50,7 @@ export interface AddMealRequest {
   macros: { calories: number; protein: number; carbs: number; fat: number }
   instructions: string[]
   category: string
+  servings: number
   tags: string[]
 }
 

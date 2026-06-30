@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { MealsPage } from '@/features/meals/MealsPage'
+import type { AddMealRequest } from '@/api/types'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -73,5 +74,27 @@ describe('MealsPage', () => {
     fireEvent.click(await screen.findByText('Chicken Bowl'))
     expect(await screen.findByText(/makes 2 servings/i)).toBeInTheDocument()
     expect(screen.getByText('Cook chicken')).toBeInTheDocument()
+  })
+
+  it('sends servings in the add-meal payload', async () => {
+    let body: AddMealRequest | null = null
+    server.use(
+      http.get('http://localhost/api/meals/search', () => HttpResponse.json([])),
+      http.post('http://localhost/api/meals/add', async ({ request }) => {
+        body = (await request.json()) as AddMealRequest
+        return HttpResponse.json({
+          success: true, meal_name: 'X', newly_added: [], category: 'Dinner', message: 'ok',
+        })
+      })
+    )
+    renderMealsPage()
+    fireEvent.click(await screen.findByRole('button', { name: /add meal/i }))
+    fireEvent.change(screen.getByLabelText(/meal name/i), { target: { value: 'X' } })
+    fireEvent.change(screen.getByLabelText(/ingredients/i), { target: { value: 'Egg' } })
+    fireEvent.change(screen.getByLabelText(/instructions/i), { target: { value: 'Cook' } })
+    fireEvent.change(screen.getByLabelText(/servings/i), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: /save meal/i }))
+    await waitFor(() => expect(body).not.toBeNull())
+    expect(body!.servings).toBe(4)
   })
 })
