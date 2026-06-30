@@ -16,6 +16,7 @@ const SAVED_MEAL = {
   name: 'Chicken Bowl',
   version: '2024-01-01',
   category: 'Dinner',
+  servings: 1,
   macros: { calories: 500, protein: 35, carbs: 40, fat: 12 },
   ingredients: ['Chicken', 'Rice'],
   instructions: ['Cook chicken', 'Serve with rice'],
