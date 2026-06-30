@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from .recipe_format import parse_recipe_row
+
 
 def load_static_data() -> dict:
     """Load static data files: standardized food.csv plus specialty and recipes."""
@@ -30,48 +32,14 @@ def save_recipes(recipes_content: str, recipes_path: Path) -> bool:
 
 
 def load_recipes(recipes_content: str) -> list:
-    """Parse recipes markdown file and return list of meal dicts."""
-    meals = []
-    
+    """Parse recipes markdown content and return list of meal dicts."""
     if not recipes_content.strip():
-        return meals
-    
-    lines = recipes_content.strip().split('\n')
-    
-    # Skip first 4 lines (header comments)
-    for line in lines[4:]:
-        if line.strip().startswith('|:---:') or line.strip().startswith('| name'):
-            continue
-        if line.strip():
-            parts = line.split('|')
-            if len(parts) == 9:
-                meal = {
-                    'name': parts[1].strip(),
-                    'version': parts[2].strip(),
-                    'category': parts[3].strip(),
-                    'macros_raw': parts[4].strip(),
-                    'ingredients': [ing.strip() for ing in parts[5].strip().split(', ') if ing.strip()],
-                    'instructions': parts[6].strip(),
-                    'tags': [tag.strip() for tag in parts[7].strip().split(',') if tag.strip()]
-                }
-                
-                # Parse macros
-                if meal['macros_raw']:
-                    try:
-                        macro_parts = meal['macros_raw'].split(',')
-                        meal['macros'] = {
-                            'calories': int(macro_parts[0]) if macro_parts[0] else 0,
-                            'protein': int(macro_parts[1]) if macro_parts[1] else 0,
-                            'carbs': int(macro_parts[2]) if macro_parts[2] else 0,
-                            'fat': int(macro_parts[3]) if macro_parts[3] else 0
-                        }
-                    except (ValueError, IndexError):
-                        meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-                else:
-                    meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-                
-                meals.append(meal)
-    
+        return []
+    meals = []
+    for line in recipes_content.strip().split('\n'):
+        meal = parse_recipe_row(line)
+        if meal is not None:
+            meals.append(meal)
     return meals
 
 

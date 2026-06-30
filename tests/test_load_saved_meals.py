@@ -11,13 +11,13 @@ RECIPES_CONTENT_EMPTY = ""
 
 RECIPES_CONTENT = """\
 <!-- meal-recipes.md -->
-<!-- name | version | category | macros(cal,prot,carb,fat) | ingredients | instructions | tags -->
+<!-- name | version | category | servings | macros(cal,prot,carb,fat) | ingredients | instructions | tags -->
 
-| name | version | category | macros | ingredients | instructions | tags |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Chicken Bowl | 2024-01-01T00:00:00 | Dinner | 600,45,55,12 | Chicken Breast, White Rice, Broccoli | Cook chicken;Cook rice;Steam broccoli | high_protein,quick |
-| Oatmeal | 2024-01-02T00:00:00 | Breakfast | 400,15,70,8 | Oatmeal, Berries | Cook oatmeal;Add berries | vegetarian |
-| Salmon Bowl | 2024-01-03T00:00:00 | Dinner | 700,50,45,25 | Salmon, Quinoa, Spinach | Cook salmon;Cook quinoa | high_protein |
+| name | version | category | servings | macros | ingredients | instructions | tags |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Chicken Bowl | 2024-01-01T00:00:00 | Dinner | 1 | 600,45,55,12 | Chicken Breast, White Rice, Broccoli | Cook chicken;Cook rice;Steam broccoli | high_protein,quick |
+| Oatmeal | 2024-01-02T00:00:00 | Breakfast | 1 | 400,15,70,8 | Oatmeal, Berries | Cook oatmeal;Add berries | vegetarian |
+| Salmon Bowl | 2024-01-03T00:00:00 | Dinner | 2 | 700,50,45,25 | Salmon, Quinoa, Spinach | Cook salmon;Cook quinoa | high_protein |
 """
 
 
@@ -48,6 +48,7 @@ def test_load_saved_meals_parses_fields(monkeypatch):
     assert chicken['macros']['protein'] == 45
     assert 'Chicken Breast' in chicken['ingredients']
     assert 'high_protein' in chicken['tags']
+    assert chicken['servings'] == 1
 
 def test_load_saved_meals_filter_by_category(monkeypatch):
     _patched_load_meals(monkeypatch, RECIPES_CONTENT)

@@ -28,13 +28,13 @@ SPECIALTY_MD = """\
 
 RECIPES_MD_HEADER = """\
 <!-- meal-recipes.md -->
-<!-- name | version | category | macros(cal,prot,carb,fat) | ingredients | instructions | tags -->
+<!-- name | version | category | servings | macros(cal,prot,carb,fat) | ingredients | instructions | tags -->
 
-| name | version | category | macros | ingredients | instructions | tags |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| name | version | category | servings | macros | ingredients | instructions | tags |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 """
 
-MEAL_ROW = "| Chicken Bowl | 2024-01-01T00:00:00 | Dinner | 500,40,50,10 | Chicken Breast, White Rice | Cook chicken;Cook rice | high_protein |"
+MEAL_ROW = "| Chicken Bowl | 2024-01-01T00:00:00 | Dinner | 1 | 500,40,50,10 | Chicken Breast, White Rice | Cook chicken;Cook rice | high_protein |"
 
 
 # --- validate_meal_params ---
@@ -89,6 +89,7 @@ def test_load_recipes_parses_row():
     assert meals[0]['macros']['protein'] == 40
     assert 'Chicken Breast' in meals[0]['ingredients']
     assert 'high_protein' in meals[0]['tags']
+    assert meals[0]['servings'] == 1
 
 
 # --- save_recipes ---
