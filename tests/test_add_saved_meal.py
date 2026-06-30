@@ -13,6 +13,7 @@ from tools.add_saved_meal import (
     add_new_food,
     invalidate_caches,
     _build_specialty_dict,
+    add_saved_meal_from_request,
 )
 
 # --- Sample data ---
@@ -151,3 +152,63 @@ def test_add_new_food_appends_row(tmp_path, monkeypatch):
     parsed = _build_specialty_dict(content)
     assert 'quest bar' in parsed
     assert parsed['quest bar']['calories'] == 200
+
+
+# --- add_saved_meal_from_request servings ---
+
+def test_add_meal_writes_servings_column(tmp_path, monkeypatch):
+    import tools.add_saved_meal as asm
+
+    recipes_path = tmp_path / "meal-recipes.md"
+    recipes_path.write_text(RECIPES_MD_HEADER)
+    specialty_path = tmp_path / "specialty-ingredients.md"
+    specialty_path.write_text(SPECIALTY_MD)
+
+    monkeypatch.setattr(asm, 'load_static_data', lambda: {
+        'food_db': '', 'specialty': SPECIALTY_MD, 'recipes': recipes_path.read_text(),
+    })
+    monkeypatch.setattr(asm.Path, 'write_text', Path.write_text)  # keep real write
+    monkeypatch.setattr(
+        asm, 'save_recipes',
+        lambda content, _path: bool(recipes_path.write_text(content)) or True,
+    )
+
+    result = add_saved_meal_from_request({
+        'name': 'Test Bowl',
+        'ingredients': ['Chicken Breast'],
+        'macros': {'calories': 400, 'protein': 30, 'carbs': 20, 'fat': 10},
+        'instructions': ['Cook it', 'Plate it'],
+        'category': 'Dinner',
+        'tags': ['quick'],
+        'servings': 3,
+    }, prompt_session=False)
+
+    assert result['success'] is True
+    meals = load_recipes(recipes_path.read_text())
+    saved = next(m for m in meals if m['name'] == 'Test Bowl')
+    assert saved['servings'] == 3
+    assert saved['instructions'] == ['Cook it', 'Plate it']
+
+
+def test_add_meal_defaults_servings_to_one(tmp_path, monkeypatch):
+    import tools.add_saved_meal as asm
+    recipes_path = tmp_path / "meal-recipes.md"
+    recipes_path.write_text(RECIPES_MD_HEADER)
+    monkeypatch.setattr(asm, 'load_static_data', lambda: {
+        'food_db': '', 'specialty': SPECIALTY_MD, 'recipes': recipes_path.read_text(),
+    })
+    monkeypatch.setattr(
+        asm, 'save_recipes',
+        lambda content, _path: bool(recipes_path.write_text(content)) or True,
+    )
+    add_saved_meal_from_request({
+        'name': 'No Servings Meal',
+        'ingredients': ['Chicken Breast'],
+        'macros': {'calories': 400, 'protein': 30, 'carbs': 20, 'fat': 10},
+        'instructions': ['Cook'],
+        'category': 'Dinner',
+        'tags': [],
+    }, prompt_session=False)
+    meals = load_recipes(recipes_path.read_text())
+    saved = next(m for m in meals if m['name'] == 'No Servings Meal')
+    assert saved['servings'] == 1

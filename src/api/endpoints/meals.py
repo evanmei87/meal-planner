@@ -38,7 +38,8 @@ async def add_meal(request: AddMealRequest):
             'macros': request.macros,
             'instructions': request.instructions,
             'category': request.category,
-            'tags': request.tags
+            'tags': request.tags,
+            'servings': request.servings,
         }
         result = add_saved_meal_from_request(meal_data, prompt_session=False)
         return AddMealResponse(**result)

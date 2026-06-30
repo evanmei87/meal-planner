@@ -224,13 +224,14 @@ def validate_meal_params(meal_name: str, ingredients: list,
     return errors
 
 
-def add_saved_meal(meal_name: str, ingredients: list, 
-                   macros: dict, instructions: list, 
-                   category: str = "Dinner", tags: list = None, 
+def add_saved_meal(meal_name: str, ingredients: list,
+                   macros: dict, instructions: list,
+                   category: str = "Dinner", tags: list = None,
+                   servings: int = 1,
                    prompt_session=True) -> dict:
     """
     Add a saved meal to the recipes database.
-    
+
     Args:
         meal_name: Name of the meal
         ingredients: List of ingredient food names
@@ -238,8 +239,9 @@ def add_saved_meal(meal_name: str, ingredients: list,
         instructions: List of instruction steps
         category: Meal category (Breakfast/Lunch/Dinner/etc.)
         tags: List of tags for the meal
+        servings: Number of servings the recipe yields
         prompt_session: Whether to prompt for new food properties
-    
+
     Returns:
         dict with success status and newly added foods
     """
@@ -327,7 +329,7 @@ def add_saved_meal(meal_name: str, ingredients: list,
     # Format tags with pipe separator for markdown
     tags_formatted = ','.join(str(tag) for tag in tags) if tags else ''
     
-    new_row = f"| {meal_name} | {timestamp} | {category} | {macros_str} | {ingredients_str} | {instructions_str} | {tags_formatted} |"
+    new_row = f"| {meal_name} | {timestamp} | {category} | {servings} | {macros_str} | {ingredients_str} | {instructions_str} | {tags_formatted} |"
     
     # Append to recipes
     recipes_lines = recipes_content.split('\n')
@@ -362,6 +364,7 @@ def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
             - instructions: List of instruction steps
             - category: Meal category (default: Dinner)
             - tags: List of tags (optional)
+            - servings: Number of servings the recipe yields (default: 1)
         prompt_session: Whether to prompt for new food properties (default: False for API)
     
     Returns:
@@ -374,6 +377,7 @@ def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
         instructions=meal_data.get('instructions', []),
         category=meal_data.get('category', 'Dinner'),
         tags=meal_data.get('tags', []),
+        servings=meal_data.get('servings', 1),
         prompt_session=prompt_session
     )
 
