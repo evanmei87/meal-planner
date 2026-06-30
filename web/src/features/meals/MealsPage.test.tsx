@@ -16,6 +16,7 @@ const MEALS = [
     name: 'Chicken Bowl',
     version: '2024-01-01',
     category: 'Dinner',
+    servings: 2,
     macros: { calories: 500, protein: 35, carbs: 40, fat: 12 },
     ingredients: ['Chicken', 'Rice'],
     instructions: ['Cook chicken', 'Serve with rice'],
@@ -64,5 +65,13 @@ describe('MealsPage', () => {
     await screen.findByRole('button', { name: /add meal/i })
     fireEvent.click(screen.getByRole('button', { name: /add meal/i }))
     expect(screen.getByLabelText(/meal name/i)).toBeInTheDocument()
+  })
+
+  it('opens a detail dialog when a meal row is clicked', async () => {
+    server.use(http.get('http://localhost/api/meals/search', () => HttpResponse.json(MEALS)))
+    renderMealsPage()
+    fireEvent.click(await screen.findByText('Chicken Bowl'))
+    expect(await screen.findByText(/makes 2 servings/i)).toBeInTheDocument()
+    expect(screen.getByText('Cook chicken')).toBeInTheDocument()
   })
 })

@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
 import { Table } from '@/components/Table'
-import type { AddMealRequest, SearchParams } from '@/api/types'
+import type { AddMealRequest, MealResponse, SearchParams } from '@/api/types'
 import { ApiError } from '@/api/client'
 import { useSearchMeals, useAddMeal } from '@/features/meals/hooks'
+import { MealDetailDialog } from '@/features/meals/MealDetailDialog'
 
 export function MealsPage() {
   const [filters, setFilters] = useState<SearchParams>({})
   const [searchInput, setSearchInput] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [selectedMeal, setSelectedMeal] = useState<MealResponse | null>(null)
   const { data: meals, isLoading, isError, error } = useSearchMeals(filters)
   const addMeal = useAddMeal()
 
@@ -131,6 +133,14 @@ export function MealsPage() {
           { key: 'macros', header: 'Fat', render: (v) => `${(v as { fat: number }).fat}g` },
         ]}
         rows={(meals ?? []) as unknown as Record<string, unknown>[]}
+        onRowClick={(row) => setSelectedMeal(row as unknown as MealResponse)}
+      />
+      <MealDetailDialog
+        meal={selectedMeal}
+        open={selectedMeal !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMeal(null)
+        }}
       />
     </div>
   )
