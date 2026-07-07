@@ -123,5 +123,14 @@ def test_search_meals_invalid_api_key(client):
         "/meals/search",
         headers={"X-API-Key": "invalid-key"}
     )
-    
+
     assert response.status_code == 401
+
+
+def test_meal_response_defaults_servings(client, api_key_headers, sample_meal):
+    """A meal dict without 'servings' serializes with servings defaulted to 1."""
+    with patch('src.api.endpoints.meals.load_saved_meals') as mock_load:
+        mock_load.return_value = [sample_meal]  # sample_meal has no 'servings'
+        response = client.get("/meals/", headers=api_key_headers)
+        assert response.status_code == 200
+        assert response.json()[0]['servings'] == 1

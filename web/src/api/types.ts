@@ -37,6 +37,7 @@ export interface MealResponse {
   name: string
   version: string
   category: string
+  servings: number
   macros: { calories: number; protein: number; carbs: number; fat: number }
   ingredients: string[]
   instructions: string[]
@@ -49,6 +50,7 @@ export interface AddMealRequest {
   macros: { calories: number; protein: number; carbs: number; fat: number }
   instructions: string[]
   category: string
+  servings: number
   tags: string[]
 }
 

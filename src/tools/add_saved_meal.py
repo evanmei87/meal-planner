@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from .recipe_format import parse_recipe_row
+
 
 def load_static_data() -> dict:
     """Load static data files: standardized food.csv plus specialty and recipes."""
@@ -30,48 +32,14 @@ def save_recipes(recipes_content: str, recipes_path: Path) -> bool:
 
 
 def load_recipes(recipes_content: str) -> list:
-    """Parse recipes markdown file and return list of meal dicts."""
-    meals = []
-    
+    """Parse recipes markdown content and return list of meal dicts."""
     if not recipes_content.strip():
-        return meals
-    
-    lines = recipes_content.strip().split('\n')
-    
-    # Skip first 4 lines (header comments)
-    for line in lines[4:]:
-        if line.strip().startswith('|:---:') or line.strip().startswith('| name'):
-            continue
-        if line.strip():
-            parts = line.split('|')
-            if len(parts) == 9:
-                meal = {
-                    'name': parts[1].strip(),
-                    'version': parts[2].strip(),
-                    'category': parts[3].strip(),
-                    'macros_raw': parts[4].strip(),
-                    'ingredients': [ing.strip() for ing in parts[5].strip().split(', ') if ing.strip()],
-                    'instructions': parts[6].strip(),
-                    'tags': [tag.strip() for tag in parts[7].strip().split(',') if tag.strip()]
-                }
-                
-                # Parse macros
-                if meal['macros_raw']:
-                    try:
-                        macro_parts = meal['macros_raw'].split(',')
-                        meal['macros'] = {
-                            'calories': int(macro_parts[0]) if macro_parts[0] else 0,
-                            'protein': int(macro_parts[1]) if macro_parts[1] else 0,
-                            'carbs': int(macro_parts[2]) if macro_parts[2] else 0,
-                            'fat': int(macro_parts[3]) if macro_parts[3] else 0
-                        }
-                    except (ValueError, IndexError):
-                        meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-                else:
-                    meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-                
-                meals.append(meal)
-    
+        return []
+    meals = []
+    for line in recipes_content.strip().split('\n'):
+        meal = parse_recipe_row(line)
+        if meal is not None:
+            meals.append(meal)
     return meals
 
 
@@ -256,13 +224,14 @@ def validate_meal_params(meal_name: str, ingredients: list,
     return errors
 
 
-def add_saved_meal(meal_name: str, ingredients: list, 
-                   macros: dict, instructions: list, 
-                   category: str = "Dinner", tags: list = None, 
+def add_saved_meal(meal_name: str, ingredients: list,
+                   macros: dict, instructions: list,
+                   category: str = "Dinner", tags: list = None,
+                   servings: int = 1,
                    prompt_session=True) -> dict:
     """
     Add a saved meal to the recipes database.
-    
+
     Args:
         meal_name: Name of the meal
         ingredients: List of ingredient food names
@@ -270,8 +239,9 @@ def add_saved_meal(meal_name: str, ingredients: list,
         instructions: List of instruction steps
         category: Meal category (Breakfast/Lunch/Dinner/etc.)
         tags: List of tags for the meal
+        servings: Number of servings the recipe yields
         prompt_session: Whether to prompt for new food properties
-    
+
     Returns:
         dict with success status and newly added foods
     """
@@ -359,7 +329,7 @@ def add_saved_meal(meal_name: str, ingredients: list,
     # Format tags with pipe separator for markdown
     tags_formatted = ','.join(str(tag) for tag in tags) if tags else ''
     
-    new_row = f"| {meal_name} | {timestamp} | {category} | {macros_str} | {ingredients_str} | {instructions_str} | {tags_formatted} |"
+    new_row = f"| {meal_name} | {timestamp} | {category} | {servings} | {macros_str} | {ingredients_str} | {instructions_str} | {tags_formatted} |"
     
     # Append to recipes
     recipes_lines = recipes_content.split('\n')
@@ -394,6 +364,7 @@ def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
             - instructions: List of instruction steps
             - category: Meal category (default: Dinner)
             - tags: List of tags (optional)
+            - servings: Number of servings the recipe yields (default: 1)
         prompt_session: Whether to prompt for new food properties (default: False for API)
     
     Returns:
@@ -406,6 +377,7 @@ def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
         instructions=meal_data.get('instructions', []),
         category=meal_data.get('category', 'Dinner'),
         tags=meal_data.get('tags', []),
+        servings=meal_data.get('servings', 1),
         prompt_session=prompt_session
     )
 

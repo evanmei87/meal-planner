@@ -68,6 +68,7 @@ class AddMealRequest(BaseModel):
     macros: dict = Field(..., description="Macros with keys: calories, protein, carbs, fat")
     instructions: List[str] = Field(..., min_length=1, description="Cooking instructions")
     category: str = Field(default="Dinner", description="Meal category")
+    servings: int = Field(default=1, ge=1, description="Number of servings the recipe yields")
     tags: List[str] = Field(default_factory=list, description="Meal tags")
 
 
@@ -85,6 +86,7 @@ class MealResponse(BaseModel):
     name: str
     version: str
     category: str
+    servings: int = Field(default=1, ge=1)
     macros: dict
     ingredients: List[str]
     instructions: List[str]

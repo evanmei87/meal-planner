@@ -1,6 +1,8 @@
 """Tool to load and display saved meals from meal-recipes.md."""
 from pathlib import Path
 
+from .recipe_format import parse_recipe_row
+
 
 def load_static_data() -> dict:
     """Load static markdown data files."""
@@ -46,53 +48,11 @@ def load_saved_meals(filter_category: str = None,
     if not recipes_content.strip():
         return meals
     
-    lines = recipes_content.strip().split('\n')
-    
-    # Find the first data row (after header comments and separator)
-    # Structure: header comments (3 lines) + blank line + separator row + data rows
-    data_start_idx = 5
-    
-    for line in lines[data_start_idx:]:
-        # Skip empty lines or separator rows
-        if not line.strip() or line.strip().startswith('|:---:'):
-            continue
-            
-        # Split by pipe, filter out empty strings
-        parts = [p.strip() for p in line.split('|') if p.strip()]
-        
-        # Handle case where first field is empty (leading |)
-        if not parts[0] and len(parts) > 1:
-            parts = parts[1:]
-        
-        if len(parts) >= 7:
-            meal = {
-                'name': parts[0].strip(),
-                'version': parts[1].strip(),
-                'category': parts[2].strip(),
-                'macros_raw': parts[3].strip(),
-                'ingredients': [ing.strip() for ing in parts[4].strip().split(', ') if ing.strip()],
-                'instructions': [inst.strip() for inst in parts[5].strip().split(';') if inst.strip()],
-                'tags': [tag.strip() for tag in parts[6].strip().split(',') if tag.strip()]
-            }
-            
-            # Parse macros
-            if meal['macros_raw']:
-                try:
-                    macro_parts = meal['macros_raw'].split(',')
-                    meal['macros'] = {
-                        'calories': int(macro_parts[0]) if macro_parts[0] else 0,
-                        'protein': int(macro_parts[1]) if macro_parts[1] else 0,
-                        'carbs': int(macro_parts[2]) if macro_parts[2] else 0,
-                        'fat': int(macro_parts[3]) if macro_parts[3] else 0
-                    }
-                except (ValueError, IndexError) as e:
-                    meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-                    print(f"Warning: Failed to parse macros for {meal['name']}: {e}")
-            else:
-                meal['macros'] = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
-            
+    for line in recipes_content.strip().split('\n'):
+        meal = parse_recipe_row(line)
+        if meal is not None:
             meals.append(meal)
-    
+
     # Apply filters
     if filter_category:
         meals = [m for m in meals if m['category'].lower() == filter_category.lower()]
