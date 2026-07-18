@@ -1,0 +1,18 @@
+{
+  "projectId": "2c1ef3ed-4165-4fbb-b39a-8073c5f9ca9b",
+  "shape": "package",
+  "pkg": "meal-planner-web",
+  "globalName": "MealPlannerUI",
+  "srcDir": "src/components",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "dist/styles.css",
+  "extraFonts": ["node_modules/@fontsource-variable/geist/index.css"],
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Dialog": { "cardMode": "single", "primaryStory": "Open" },
+    "DialogClose": { "cardMode": "single", "primaryStory": "InOpenDialog" },
+    "DialogContent": { "cardMode": "single", "primaryStory": "WithActions" },
+    "DialogDescription": { "cardMode": "single", "primaryStory": "Informational" },
+    "DialogTitle": { "cardMode": "single", "primaryStory": "Short" }
+  }
+}
