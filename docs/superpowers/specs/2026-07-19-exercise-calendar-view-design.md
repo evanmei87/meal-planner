@@ -16,7 +16,7 @@ Add a fifth tab, **Exercise**, showing the current week (Monday–Sunday) as a h
 | Week navigation | **None** — current week only | Matches the AC exactly (7 cells for the week containing today, no prev/next). Navigation is out of scope for this issue; can be a follow-up if wanted. |
 | Today-highlight color | **`bg-primary text-primary-foreground`** (via `Button variant="default"`), not the issue's literal `bg-green-600 text-white` example | [`docs/design-tokens.md`](../../design-tokens.md) already reserves this exact token for #28's today-highlight. The issue's inline example predates that doc section; the doc is the current source of truth. |
 | Date arithmetic | Local-timezone `Date` arithmetic (`getDay()`/`setDate()`) on a `T00:00:00`-anchored `Date`, not `toISOString()` | `toISOString()` converts to UTC first, shifting the calendar date whenever local time is behind UTC (true for all US zones) — a real bug against the EST requirement. `getDay()`/`setDate()` operate on the local calendar fields and are DST-safe for this use (no epoch-based day-skipping). |
-| Day-cell composition | `Card` (zero padding) wrapping a `Button` that fills it | AC requires `Card` for the cells; the design-system gate forbids bare `<button>` and requires `Button` for anything interactive. `Card` alone isn't clickable/keyboard-accessible, so `Button` is nested inside it as the actual control. |
+| Day-cell composition | `Card` (default padding) wrapping a full-width `Button` | AC requires `Card` for the cells; the design-system gate forbids bare `<button>` and requires `Button` for anything interactive. `Card` alone isn't clickable/keyboard-accessible, so `Button` is nested inside it as the actual control. `Card.tsx` concatenates classes with a plain template string (no `tailwind-merge`), so a `className="p-0"` override on `Card` isn't guaranteed to win the cascade over its built-in `p-4` — Tailwind's CSS output order depends on build-scan order, not class-attribute order. Keeping `Card`'s default padding and sizing `Button` to `w-full` inside it avoids that gamble entirely. |
 | Non-today button variant | `ghost`, not `outline` | `outline` draws its own `border-border`, which combined with `Card`'s own border produces a visible double-border a pixel apart. `ghost` has no border of its own, so `Card`'s border is the only one drawn. |
 | Initial `selectedDate` | Defaults to `getTodayInEST()` | The placeholder is populated on first render ("Exercises for {today}") rather than blank until a click. |
 | Selected-but-not-today styling | None | The AC only calls for a distinct style on the *today* cell. Clicking a non-today cell changes only the placeholder text, not the cell's appearance — avoids inventing an unspecified second visual state. |
@@ -53,11 +53,11 @@ const [selectedDate, setSelectedDate] = useState(today)
 
 <div className="flex gap-2 mb-4 flex-wrap">
   {week.map((day) => (
-    <Card key={day.date} className="p-0">
+    <Card key={day.date}>
       <Button
         variant={day.date === today ? 'default' : 'ghost'}
         onClick={() => setSelectedDate(day.date)}
-        className="w-full flex-col gap-0.5 h-auto py-3"
+        className="w-full flex-col gap-0.5 h-auto py-2"
       >
         <span>{day.dayName.slice(0, 3)}</span>
         <span>{formatShort(day.date)}</span>
@@ -88,4 +88,4 @@ No new test dependencies — existing `@testing-library/react` + `vitest` stack.
 
 - **Design-system gate**: `ExerciseCalendarPage.tsx` is in the gated scope (`web/src/features/*/*.tsx`). The `Card`+`Button` composition above is deliberately token-only (no raw Tailwind palette classes, no bare `<button>`) so it doesn't regress `no-raw-palette` / `no-bare-button` counts in `.design-sync/check/baseline.json`.
 - **Tier 2 review**: this is new page-level layout under `features/`, so it will make `/ds-review` overdue per the Stop hook. Per `CLAUDE.md`, that review will be offered (not run unprompted) at a natural boundary — before the PR.
-- `Card`+`Button` nesting (zero-padding `Card`, `Button` filling it) is a new pattern for this codebase — no existing screen combines them this way. Worth a visual sanity check once running in the browser.
+- `Card`+`Button` nesting (default-padding `Card`, full-width `Button` inside it) is a new pattern for this codebase — no existing screen combines them this way. Worth a visual sanity check once running in the browser.
