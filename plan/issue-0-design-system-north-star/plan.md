@@ -1158,8 +1158,10 @@ git commit -m "feat: add ds-review skill for Tier 2 visual design checks"
 
 - [ ] **Step 1: Run every checker test together**
 
-Run: `node --test .design-sync/check/`
-Expected: PASS, 36 tests total (7 scanner + 12 rules + 4 CLI + 5 gate + 8 stamp), 0 failures.
+Run: `node --test '.design-sync/check/**/*.test.mjs'`
+Expected: PASS, 38 tests total (8 scanner + 12 rules + 5 CLI + 5 gate + 8 stamp), 0 failures.
+
+**Do not use the bare-directory form `node --test .design-sync/check/`** — it fails with `MODULE_NOT_FOUND` on Windows/Git Bash, reporting `fail 1` with `pass 0` while discovering nothing. Quote the glob so the shell passes it to Node rather than expanding it. An explicit file list (`node --test .design-sync/check/*.test.mjs .design-sync/check/lib/*.test.mjs`) also works.
 
 - [ ] **Step 2: Confirm the frontend test suite is unaffected**
 
