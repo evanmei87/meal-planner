@@ -53,3 +53,12 @@ test('does not match a name that is a prefix of a longer tag', () => {
   const tags = extractTags('<inputGroup x />', ['input'])
   assert.equal(tags.length, 0, 'word boundary must prevent inputGroup matching input')
 })
+
+test('falls back to end of source on an unterminated tag', () => {
+  // Brace depth never returns to 0, so no `>` at depth 0 is ever found.
+  const src = '<input className={cn("a"'
+  const tags = extractTags(src, ['input'])
+  assert.equal(tags.length, 1)
+  assert.equal(tags[0].index, 0)
+  assert.equal(tags[0].text, src, 'documented fallback: consume to end of source')
+})
