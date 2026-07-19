@@ -120,7 +120,17 @@ Failure output names `file:line` for **new violations only**. A gate that prints
 
 ### 3. Tier 2 — visual review
 
-A `/ds-review` skill at `.claude/skills/ds-review/SKILL.md`, invoked deliberately. Playwright capture is too slow to attach to a per-turn hook.
+A `/ds-review` skill at `.claude/skills/ds-review/SKILL.md`. The review itself is invoked deliberately — it needs both servers, a browser, and model judgment, none of which a shell hook can supply. What *is* automatic is knowing the review is overdue.
+
+#### Staleness tracking
+
+A hook cannot run the review, but it can refuse to let the need for one go unnoticed. `/ds-review` writes `.design-sync/check/review-stamp.json` recording the visual state of the pages it graded. A cheap deterministic check compares current state to that stamp and reports drift.
+
+**The stamp hashes only `className` string literals**, extracted with the same brace-aware scanner Tier 1 uses — not whole files. A `useState` refactor does not make a visual review overdue; changing `p-4` to `p-6` does. Hashing whole files would demand re-review after any logic edit, which trains the reader to ignore the notice within a week.
+
+**The notice is advisory, never blocking.** The Stop hook reports staleness as a fact; it does not fail the turn. Gating commits on a browser session would put a server boot in front of every styling commit, and the resulting `--no-verify` habit would erode Tier 1's gate along with it. A warning that is acted on beats a block that is bypassed.
+
+Raising it is then a judgment call recorded in `CLAUDE.md`: when the stamp is stale and work is about to be committed or pushed, or a chunk of visual work is being reported complete, offer to run `/ds-review`. The deterministic half — whether pages changed — is machine-determined and cannot be forgotten. The discretionary half — whether now is a sensible moment to ask — stays with the assistant.
 
 Flow: the existing `run-app` skill brings up both servers; browser tools drive the four feature pages at desktop (1280×800) and mobile (375×812); screenshots are graded against Tier 2 invariants.
 
@@ -162,6 +172,8 @@ A `Stop` hook was chosen over an npm script or a manually invoked skill because 
 
 **`CLAUDE.md`** gains a pointer to `north-star.md`, placing the standard in context during authoring. The hook is a backstop, not the primary channel — code should be correct before the gate runs, not corrected because it failed.
 
+`CLAUDE.md` also carries the rule for raising Tier 2: when the review stamp is stale and work is about to be committed or pushed, or a chunk of visual work is being reported complete, state that Tier 1 passed and Tier 2 is overdue, and offer to run `/ds-review`.
+
 ## Verification
 
 Each criterion is pass/fail, not "it runs":
@@ -178,6 +190,7 @@ Each criterion is pass/fail, not "it runs":
 
 - **Invariant 3 is unenforceable on arrival.** No `Input` primitive exists. The identical four-page input class string is a component that was never extracted. `ds-check` will report `no-adhoc-input` counts, but there is no sanctioned replacement to migrate toward. Extracting `Input` is follow-up work.
 - **Tier 2 depends on judgment.** Comparison-framed questions constrain it substantially, but it will not be perfectly repeatable across runs.
+- **Tier 2 remains declinable.** Staleness tracking removes forgetting as a failure mode, not declining. A user who says "not now" every time ends up exactly where they started. This is a deliberate trade: the alternative is blocking commits on a browser session, which buys compliance at the cost of an `--no-verify` habit that would undermine Tier 1 too.
 - **Regex detection has known limits.** Class names assembled at runtime through template literals still evade `no-raw-palette`; `PlanPage.tsx:83` already builds classes this way. Accepted: the rule catches the common case and Tier 2 is the backstop. (Multi-line JSX is *not* a gap — the brace-aware scanner handles it.)
 - **The checker needs its own test.** A rule that matches nothing is indistinguishable from a clean codebase. Three separate counting attempts during this design returned 0, 7, and 62 — every one of them ran without error. Each rule ships with a fixture test pinning expected counts, so a rule that silently stops matching fails loudly instead of passing.
 - **Scope is `features/` only.** Primitives may contain their own palette literals; that is out of scope here and worth a separate audit.

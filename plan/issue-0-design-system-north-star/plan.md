@@ -7,7 +7,9 @@
 
 **Goal:** Give this repo a written design-system north star plus a two-tier self-check — an automatic mechanical gate on every turn, and a deliberate visual review — so page-level drift from the design system is caught as it happens instead of accumulating invisibly.
 
-**Architecture:** A single markdown document (`.design-sync/north-star.md`) holds every invariant, each tagged Tier 1 (machine-checked) or Tier 2 (judged). A dependency-free Node script (`.design-sync/check/ds-check.mjs`) enforces the Tier 1 invariants against `web/src/features/**`, comparing counts to a checked-in `baseline.json` that ratchets down but never up. A `Stop` hook runs that script every turn. A `/ds-review` skill drives the running app in a browser and grades the four feature pages against each other for Tier 2 invariants.
+**Architecture:** A single markdown document (`.design-sync/north-star.md`) holds every invariant, each tagged Tier 1 (machine-checked) or Tier 2 (judged). A dependency-free Node script (`.design-sync/check/ds-check.mjs`) enforces the Tier 1 invariants against `web/src/features/**`, comparing counts to a checked-in `baseline.json` that ratchets down but never up. A `Stop` hook runs that script every turn, blocking on Tier 1 regressions.
+
+Tier 2 cannot run in a hook — it needs both servers, a browser, and model judgment. So the hook tracks *staleness* instead: `/ds-review` stamps a hash of the `className` values it reviewed, and the hook reports when they have changed since. That notice is advisory and never blocks; `CLAUDE.md` instructs the assistant to raise it before a commit or push, or when reporting visual work complete. Hashing className only means logic refactors do not trigger it — a notice that fires constantly is a notice that gets ignored.
 
 **Tech Stack:** Node 24 (native `node:test`, `node:fs.globSync`), plain ESM, no new dependencies. Existing: React 18 + TypeScript + Tailwind v4 + `@base-ui/react` in `web/`.
 
@@ -31,7 +33,7 @@
 
 **Interfaces:**
 - Consumes: nothing
-- Produces: the invariant table that Task 3's rule IDs and Task 7's rubric must match. Rule IDs defined here: `no-raw-palette`, `no-bare-button`, `no-adhoc-input`, `no-inline-style`.
+- Produces: the invariant table that Task 3's rule IDs and Task 8's rubric must match. Rule IDs defined here: `no-raw-palette`, `no-bare-button`, `no-adhoc-input`, `no-inline-style`.
 
 - [ ] **Step 1: Write the document**
 
@@ -419,12 +421,14 @@ git commit -m "feat: add design system rule definitions with fixture tests"
 ### Task 4: Checker CLI with real-tree assertion
 
 **Files:**
+- Create: `.design-sync/check/lib/files.mjs`
 - Create: `.design-sync/check/ds-check.mjs`
 - Test: `.design-sync/check/ds-check.test.mjs`
 
 **Interfaces:**
 - Consumes: `RULES` from `./lib/rules.mjs` (Task 3)
 - Produces:
+  - `scopedFiles() => string[]` from `lib/files.mjs` — in-scope source paths, repo-relative with forward slashes. **Lives in its own module so Task 6's `stamp.mjs` can use it without importing `ds-check.mjs`, which would create a cycle once `ds-check.mjs` imports `reviewIsStale` in Task 7.**
   - `collectViolations() => Record<string, Array<{file: string, line: number, text: string}>>` keyed by rule ID
   - `countsOf(violations) => Record<string, number>`
   - CLI: bare `node ds-check.mjs` prints a report; `--json` prints machine-readable counts
@@ -483,12 +487,10 @@ Expected: FAIL — `Cannot find module` for `ds-check.mjs`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `.design-sync/check/ds-check.mjs`:
+First create `.design-sync/check/lib/files.mjs`:
 
 ```javascript
-#!/usr/bin/env node
-import { readFileSync, globSync } from 'node:fs'
-import { RULES } from './lib/rules.mjs'
+import { globSync } from 'node:fs'
 
 const SCOPE = 'web/src/features/*/*.tsx'
 
@@ -499,6 +501,17 @@ export function scopedFiles() {
     .filter((f) => !f.endsWith('.test.tsx'))
     .sort()
 }
+```
+
+Then create `.design-sync/check/ds-check.mjs`:
+
+```javascript
+#!/usr/bin/env node
+import { readFileSync } from 'node:fs'
+import { RULES } from './lib/rules.mjs'
+import { scopedFiles } from './lib/files.mjs'
+
+export { scopedFiles }
 
 /** All violations, keyed by rule id. */
 export function collectViolations() {
@@ -764,14 +777,179 @@ git commit -m "feat: add baseline ratchet and gate mode to ds-check"
 
 ---
 
-### Task 6: Stop hook wiring
+### Task 6: Tier 2 staleness stamp
+
+Tier 2 cannot run in a hook — it needs both servers, a browser, and model judgment. What a hook *can* do is notice the review is overdue. This task builds that check; it never blocks.
+
+**Files:**
+- Create: `.design-sync/check/lib/stamp.mjs`
+- Test: `.design-sync/check/lib/stamp.test.mjs`
+
+**Interfaces:**
+- Consumes: `scopedFiles` from `./files.mjs` (Task 4) — **not** from `ds-check.mjs`, which would create an import cycle
+- Produces:
+  - `extractClassNames(src: string) => string[]` — every `className` attribute value, quoted or braced
+  - `currentStamp() => string` — 16-char sha256 prefix over all in-scope className values
+  - `readStamp() => string | null` — the recorded stamp, or `null` if never reviewed
+  - `writeStamp(hash: string) => void` — records a stamp at `.design-sync/check/review-stamp.json`
+  - `reviewIsStale() => boolean`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `.design-sync/check/lib/stamp.test.mjs`:
+
+```javascript
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { extractClassNames, currentStamp } from './stamp.mjs'
+
+test('extracts a quoted className', () => {
+  assert.deepEqual(extractClassNames('<div className="p-4 gap-2" />'), ['"p-4 gap-2"'])
+})
+
+test('extracts a braced template-literal className', () => {
+  const values = extractClassNames('<div className={`p-4 ${x}`} />')
+  assert.equal(values.length, 1)
+  assert.match(values[0], /p-4/)
+})
+
+test('extracts a braced call expression className', () => {
+  const values = extractClassNames('<div className={cn("p-4", other)} />')
+  assert.equal(values.length, 1)
+  assert.match(values[0], /cn\("p-4", other\)/)
+})
+
+test('handles nested braces inside a braced className', () => {
+  const values = extractClassNames('<div className={`w-${sizes[{a:1}.a]}`} />')
+  assert.equal(values.length, 1, 'must not end at the first inner closing brace')
+})
+
+test('collapses whitespace so reformatting does not count as visual change', () => {
+  const inline = extractClassNames('<div className={cn("a", "b")} />')
+  const wrapped = extractClassNames('<div className={cn(\n  "a",\n  "b",\n)} />')
+  assert.equal(inline[0].replace(/,\s*\)/, ')'), wrapped[0].replace(/,\s*\)/, ')'))
+})
+
+test('ignores non-className attributes', () => {
+  assert.deepEqual(extractClassNames('<div id="p-4" data-x="gap-2" />'), [])
+})
+
+test('currentStamp is stable across repeated calls', () => {
+  assert.equal(currentStamp(), currentStamp())
+})
+
+test('currentStamp is a 16-char hex digest', () => {
+  assert.match(currentStamp(), /^[0-9a-f]{16}$/)
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test .design-sync/check/lib/stamp.test.mjs`
+Expected: FAIL — `Cannot find module` for `stamp.mjs`.
+
+- [ ] **Step 3: Write minimal implementation**
+
+Create `.design-sync/check/lib/stamp.mjs`:
+
+```javascript
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { scopedFiles } from './files.mjs'
+
+const STAMP_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'review-stamp.json')
+
+/**
+ * Every className attribute value in `src`, quoted or braced.
+ *
+ * Only className is hashed, not whole files: a logic refactor must not make a
+ * visual review overdue, or the notice gets ignored within a week. Changing
+ * `p-4` to `p-6` must.
+ */
+export function extractClassNames(src) {
+  const values = []
+  const attr = /className=/g
+  let match
+  while ((match = attr.exec(src))) {
+    const start = match.index + match[0].length
+    if (src[start] === '"') {
+      const end = src.indexOf('"', start + 1)
+      values.push(src.slice(start, end + 1))
+    } else if (src[start] === '{') {
+      values.push(src.slice(start, findBraceEnd(src, start) + 1).replace(/\s+/g, ' '))
+    }
+  }
+  return values
+}
+
+/** Index of the brace closing the one at `start`. */
+function findBraceEnd(src, start) {
+  let depth = 0
+  for (let i = start; i < src.length; i++) {
+    if (src[i] === '{') depth++
+    else if (src[i] === '}' && --depth === 0) return i
+  }
+  return src.length - 1
+}
+
+export function currentStamp() {
+  const parts = scopedFiles().map((file) => `${file}\n${extractClassNames(readFileSync(file, 'utf8')).join('\n')}`)
+  return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 16)
+}
+
+export function readStamp() {
+  if (!existsSync(STAMP_PATH)) return null
+  return JSON.parse(readFileSync(STAMP_PATH, 'utf8')).stamp ?? null
+}
+
+export function writeStamp(hash) {
+  writeFileSync(STAMP_PATH, `${JSON.stringify({ stamp: hash }, null, 2)}\n`)
+}
+
+export function reviewIsStale() {
+  return readStamp() !== currentStamp()
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test .design-sync/check/lib/stamp.test.mjs`
+Expected: PASS, 8 tests.
+
+- [ ] **Step 5: Verify the behaviour that justifies hashing className only**
+
+```bash
+node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>console.log('base   ', m.currentStamp()))"
+printf '\nconst unusedLogicChange = 42\n' >> web/src/features/state/StatePage.tsx
+node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>console.log('logic  ', m.currentStamp()))"
+git checkout -- web/src/features/state/StatePage.tsx
+node -e "const fs=require('fs');const f='web/src/features/state/StatePage.tsx';fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace('space-y-6','space-y-8'))"
+node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>console.log('style  ', m.currentStamp()))"
+git checkout -- web/src/features/state/StatePage.tsx
+```
+
+Expected: `base` and `logic` are **identical**; `style` **differs**. If the logic edit changes the hash, the extractor is hashing more than className and the notice will fire constantly.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .design-sync/check/lib/stamp.mjs .design-sync/check/lib/stamp.test.mjs
+git commit -m "feat: track Tier 2 review staleness via className stamp"
+```
+
+---
+
+### Task 7: Stop hook wiring
 
 **Files:**
 - Create: `.claude/settings.json`
+- Modify: `.design-sync/check/ds-check.mjs` (emit the staleness notice in `--gate`)
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
-- Consumes: `node .design-sync/check/ds-check.mjs --gate` (Task 5)
+- Consumes: `node .design-sync/check/ds-check.mjs --gate` (Task 5), `reviewIsStale` from `./lib/stamp.mjs` (Task 6)
 - Produces: nothing consumed by later tasks
 
 - [ ] **Step 1: Create the project settings file**
@@ -795,12 +973,32 @@ git commit -m "feat: add baseline ratchet and gate mode to ds-check"
 }
 ```
 
-- [ ] **Step 2: Verify the hook command runs from the project root**
+- [ ] **Step 2: Emit the staleness notice from `--gate`**
+
+In `.design-sync/check/ds-check.mjs`, add the import:
+
+```javascript
+import { reviewIsStale } from './lib/stamp.mjs'
+```
+
+Then, at the end of `runGate`, after the improvements block:
+
+```javascript
+  // Advisory only — never exits non-zero. Tier 2 needs servers, a browser and
+  // judgment, so a hook can report that review is overdue but cannot perform it.
+  if (reviewIsStale()) {
+    console.log('Tier 2 visual review is stale — page styling changed since the last /ds-review.')
+  }
+```
+
+Note this sits *after* the `process.exit(1)` in the regression branch by design: when Tier 1 has failed, that is the actionable problem, and a second message competing for attention makes the first easier to skim past.
+
+- [ ] **Step 3: Verify the hook command runs from the project root**
 
 Run: `node .design-sync/check/ds-check.mjs --gate; echo "exit=$?"`
-Expected: no output, `exit=0`. The `globSync` scope is repo-relative, so the hook depends on the working directory being the project root.
+Expected: `exit=0`, with the staleness line printed (no stamp exists yet, so review is stale until Task 8 runs). The `globSync` scope is repo-relative, so the hook depends on the working directory being the project root.
 
-- [ ] **Step 3: Add the north star pointer to `CLAUDE.md`**
+- [ ] **Step 4: Add the north star pointer to `CLAUDE.md`**
 
 Append this section to `CLAUDE.md`, immediately after the `### Frontend Structure` section:
 
@@ -811,12 +1009,14 @@ Before writing or editing anything under `web/src/features/`, read `.design-sync
 
 Tier 1 invariants are enforced automatically: a `Stop` hook runs `node .design-sync/check/ds-check.mjs --gate` and fails the turn if any violation count rises above `.design-sync/check/baseline.json`. Fix new violations rather than raising the baseline — the baseline only ever moves down, automatically, and a manual increase is a reviewable change requiring justification.
 
-Tier 2 invariants are visual and cannot be linted. Run `/ds-review` before a PR that changes page layout.
+Tier 2 invariants are visual and cannot be linted, so they are not gated. Instead the hook reports when `/ds-review` is overdue — that is, when `className` values in `web/src/features/` changed since the last review.
+
+**When the hook reports Tier 2 is stale, offer the review** — do not silently skip it and do not run it unprompted. Raise it at a natural boundary: before committing or pushing, or when reporting a chunk of visual work complete. Say that Tier 1 passed, that Tier 2 is overdue, and ask whether to run `/ds-review`. It needs both servers and a browser session, so it is the user's call, but the offer is not optional.
 
 To check on demand: `node .design-sync/check/ds-check.mjs`
 ```
 
-- [ ] **Step 4: Verify the hook actually fires**
+- [ ] **Step 5: Verify the hook actually fires**
 
 An unwired hook is silent and looks identical to a passing one, so this must be confirmed directly rather than assumed.
 
@@ -834,23 +1034,23 @@ Then revert:
 git checkout -- web/src/features/plan/PlanPage.tsx
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add .claude/settings.json CLAUDE.md
+git add .claude/settings.json .design-sync/check/ds-check.mjs CLAUDE.md
 git commit -m "feat: run design system gate on every turn via Stop hook"
 ```
 
 ---
 
-### Task 7: `/ds-review` visual review skill
+### Task 8: `/ds-review` visual review skill
 
 **Files:**
 - Create: `.claude/skills/ds-review/SKILL.md`
 
 **Interfaces:**
-- Consumes: `.design-sync/north-star.md` Tier 2 invariants (Task 1); the existing `run-app` skill at `.claude/skills/run-app/SKILL.md`
-- Produces: `.design-sync/.cache/review/<Page>.grade.json` files
+- Consumes: `.design-sync/north-star.md` Tier 2 invariants (Task 1); the existing `run-app` skill at `.claude/skills/run-app/SKILL.md`; `currentStamp`/`writeStamp` from `.design-sync/check/lib/stamp.mjs` (Task 6)
+- Produces: `.design-sync/.cache/review/<Page>.grade.json` files and `.design-sync/check/review-stamp.json`
 
 - [ ] **Step 1: Write the skill**
 
@@ -916,6 +1116,16 @@ Use verdict `good` when nothing differs, `drift` with a `notes` array naming bot
 
 Note that `.design-sync/.cache/` is gitignored, so these grades are local only and do not travel into a PR. Summarize findings in chat as well.
 
+## Record the review
+
+After writing the grade files, stamp the reviewed state so the Stop hook stops reporting the review as overdue:
+
+```bash
+node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>{m.writeStamp(m.currentStamp());console.log('stamped',m.currentStamp())})"
+```
+
+Commit `.design-sync/check/review-stamp.json` alongside the change being reviewed. Only stamp after actually working the rubric — stamping without reviewing silences the notice permanently and is the one way to defeat this tier entirely.
+
 ## Reporting
 
 Report only named discrepancies. "Looks consistent" is a valid result when every rubric row passes; a vague positive when rows were not actually checked is not.
@@ -935,7 +1145,7 @@ git commit -m "feat: add ds-review skill for Tier 2 visual design checks"
 
 ---
 
-### Task 8: Full-suite verification
+### Task 9: Full-suite verification
 
 **Files:**
 - Modify: none (verification only)
@@ -947,7 +1157,7 @@ git commit -m "feat: add ds-review skill for Tier 2 visual design checks"
 - [ ] **Step 1: Run every checker test together**
 
 Run: `node --test .design-sync/check/`
-Expected: PASS, 28 tests total (7 scanner + 12 rules + 4 CLI + 5 gate), 0 failures.
+Expected: PASS, 36 tests total (7 scanner + 12 rules + 4 CLI + 5 gate + 8 stamp), 0 failures.
 
 - [ ] **Step 2: Confirm the frontend test suite is unaffected**
 
@@ -962,7 +1172,7 @@ Expected: unchanged. This plan adds no Python.
 - [ ] **Step 4: Confirm the working tree is clean**
 
 Run: `git status --porcelain`
-Expected: empty. In particular `baseline.json` must be unmodified — if it changed, an earlier verification step was not reverted.
+Expected: empty. In particular `baseline.json` and `review-stamp.json` must be unmodified — if either changed, an earlier verification step was not reverted.
 
 - [ ] **Step 5: Confirm all spec verification criteria are met**
 
@@ -972,7 +1182,9 @@ Walk the Verification section of the spec and confirm each:
 2. A deliberate violation fails the gate naming only that line — Task 5 Step 7
 3. Fixing a violation ratchets the baseline down — Task 5 Step 8
 4. Raising a baseline is a hand edit, not automatic — verify by inspection: `evaluateGate` only writes on `improvements`, never on `regressions`
-5. A real Stop event fires the hook — Task 6 Step 4
+5. A real Stop event fires the hook — Task 7 Step 5
+6. Tier 2 staleness is advisory: confirm `runGate` prints the notice without affecting exit code — Task 7 Step 3 showed `exit=0` while stale
+7. A logic edit does not mark review stale; a style edit does — Task 6 Step 5
 
 - [ ] **Step 6: Commit any outstanding plan updates**
 
@@ -985,8 +1197,12 @@ git commit -m "docs: mark design system north star plan complete"
 
 ## Self-review notes
 
-**Spec coverage.** Every spec section maps to a task: north star document → Task 1; Tier 1 rules and the brace-scanner constraint → Tasks 2–4; baseline ratchet → Task 5; Stop hook and `CLAUDE.md` → Task 6; Tier 2 review → Task 7; the spec's five verification criteria → Task 8 Step 5.
+**Spec coverage.** Every spec section maps to a task: north star document → Task 1; Tier 1 rules and the brace-scanner constraint → Tasks 2–4; baseline ratchet → Task 5; Tier 2 staleness tracking → Task 6; Stop hook and `CLAUDE.md` → Task 7; Tier 2 review → Task 8; the spec's verification criteria → Task 9 Step 5.
 
 **Deliberately out of scope.** Extracting an `Input` primitive (invariant 3 has nothing to migrate toward — recorded in the north star's Known gaps), migrating the 89 existing violations, and auditing `web/src/components/` against invariant 1.
 
-**Risk carried forward.** `no-raw-palette` cannot see inside template literals, so `PlanPage.tsx:83` is invisible to it. Tier 2 is the only backstop, and Tier 2 depends on someone remembering to run `/ds-review`.
+**Risk carried forward.**
+
+- `no-raw-palette` cannot see inside template literals, so `PlanPage.tsx:83` is invisible to it. Tier 2 is the only backstop.
+- Staleness tracking removes *forgetting* as a failure mode for Tier 2, not *declining*. A user who answers "not now" every time ends up where they started. This was chosen deliberately over gating commits, which would buy compliance at the cost of a `--no-verify` habit that would undermine Tier 1's gate as well.
+- Stamping without actually reviewing silences the notice permanently. Task 8's skill says so explicitly, but nothing enforces it — Tier 2 rests on good faith by construction.
