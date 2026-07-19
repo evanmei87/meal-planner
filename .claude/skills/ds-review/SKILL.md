@@ -61,11 +61,15 @@ Note that `.design-sync/.cache/` is gitignored, so these grades are local only a
 
 After writing the grade files, stamp the reviewed state so the Stop hook stops reporting the review as overdue:
 
+**Run this from the repository root**, not from `web/` — the import specifier is repo-relative:
+
 ```bash
-node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>{m.writeStamp(m.currentStamp());console.log('stamped',m.currentStamp())})"
+cd "$(git rev-parse --show-toplevel)" && node -e "import('./.design-sync/check/lib/stamp.mjs').then(m=>{m.writeStamp(m.currentStamp());console.log('stamped',m.currentStamp())})"
 ```
 
-Commit `.design-sync/check/review-stamp.json` alongside the change being reviewed. Only stamp after actually working the rubric — stamping without reviewing silences the notice permanently and is the one way to defeat this tier entirely.
+Commit `.design-sync/check/review-stamp.json` alongside the change being reviewed.
+
+> **Only stamp after actually working the rubric.** Stamping without reviewing silences the notice permanently and is the one way to defeat this tier entirely. Nothing enforces this — Tier 2 rests on good faith by construction.
 
 ## Reporting
 
