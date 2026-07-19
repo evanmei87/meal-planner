@@ -16,10 +16,9 @@ Measured on the current tree (`web/src/features/**`, tests excluded):
 
 | Signal | Count |
 |---|---|
-| Raw palette utilities (`bg-green-600`, `text-gray-500`, `border-gray-300`, …) | 62 |
+| Raw palette utilities (`bg-green-600`, `text-gray-500`, `border-gray-300`, …) | 69 |
 | Hand-rolled `<button>` elements | 9 |
-| `<input>` / `<select>` / `<textarea>` tags total | 11 |
-| …of those, carrying ad-hoc border and padding classes | 7 |
+| `<input>` / `<select>` / `<textarea>` tags, **all** carrying ad-hoc border classes | 11 |
 | Imports of `Button` in feature pages | 0 |
 
 `Card`, `Table`, `Spinner`, and `ErrorBanner` were adopted. `Button` never was — each page reimplements `px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium` inline. An identical input class string is duplicated verbatim across all four pages.
@@ -44,7 +43,7 @@ Note that the naive audit — grepping for hex literals and `style={{}}` — ret
 
 ## Non-goals
 
-- Migrating the 62 existing violations. The ratchet absorbs these incrementally.
+- Migrating the 89 existing violations. The ratchet absorbs these incrementally.
 - Revising the primitives. They are graded and passing; the standard is not the problem.
 - Extending the gate to `web/src/components/**`. Initial scope is `web/src/features/**`.
 
@@ -81,18 +80,23 @@ Rules:
 |---|---|
 | `no-raw-palette` | `(bg\|text\|border\|ring\|from\|to\|via)-(gray\|green\|blue\|amber\|red\|slate\|zinc)-\d{2,3}` |
 | `no-bare-button` | `<button` outside `web/src/components/` |
-| `no-adhoc-input` | line containing `<input` / `<select` / `<textarea` **and** a `border-` class |
+| `no-adhoc-input` | brace-aware tag scan for `<input` / `<select` / `<textarea` whose open-tag contains a `border-` class |
 | `no-inline-style` | `style={{`, allowlisting genuinely dynamic values |
 
 The `no-inline-style` allowlist covers `MacroDisplay.tsx`'s percentage width, which is a legitimate runtime value and stays.
 
-#### Detection constraint: no `[^>]*` tag spanning
+#### Detection constraint: JSX tags need a brace-aware scanner
 
-The natural way to write `no-adhoc-input` is `<(input|select|textarea)[^>]*border-`. **This silently matches nothing.** JSX props contain arrow functions, and the `>` in `=>` terminates the character class before it reaches `className`. Every input in this codebase has an `onChange={(e) => …}` before its `className`, so the rule reports zero violations and the gate passes green while missing all seven.
+Two naive approaches were tried and both produced confidently wrong numbers:
 
-Detection is therefore line-based: a line containing both an input-ish tag and a `border-` class. This is correct for the current code, where all such tags are single-line. Multi-line JSX would evade it — accepted, and recorded under Known gaps.
+1. **`<(input|select|textarea)[^>]*border-` matches nothing.** JSX props contain arrow functions, and the `>` in `=>` terminates the character class before it reaches `className`. Reports 0 of 11.
+2. **Line-based (tag and `border-` on the same line) reports 7 of 11.** Most inputs here are multi-line JSX, so the `className` sits several lines below the tag opener.
 
-AST-based detection was rejected as an alternative: `ts-morph` exists only in `.ds-sync/node_modules`, and `.ds-sync/` is gitignored (`.gitignore:45`), so depending on it would break on a fresh clone. `typescript` is present in `web/devDependencies` if a future version needs real parsing.
+Detection therefore uses a small brace-aware tag scanner: locate `<input` / `<select` / `<textarea`, then scan forward tracking `{}` depth and end the tag at the first `>` found at depth 0. This survives both arrow functions and newlines, and is validated at 11 of 11 on the current tree. It is roughly twenty lines and needs no parser.
+
+AST-based detection was rejected: `ts-morph` exists only in `.ds-sync/node_modules`, and `.ds-sync/` is gitignored (`.gitignore:45`), so depending on it would break on a fresh clone. `typescript` is present in `web/devDependencies` if a future version needs real parsing.
+
+**This is the central lesson of the audit, now encoded as a requirement:** every wrong number above was produced by a check that ran successfully and returned a plausible answer. Silence is not evidence of cleanliness. Each rule ships with a fixture test pinning its expected count.
 
 #### Baseline ratchet
 
@@ -100,9 +104,9 @@ AST-based detection was rejected as an alternative: `ts-morph` exists only in `.
 
 ```json
 {
-  "no-raw-palette": 62,
+  "no-raw-palette": 69,
   "no-bare-button": 9,
-  "no-adhoc-input": 7,
+  "no-adhoc-input": 11,
   "no-inline-style": 0
 }
 ```
@@ -112,7 +116,7 @@ The gate fails only when a count **exceeds** its baseline.
 - **Ratchets down automatically.** When a count drops, the script rewrites the baseline lower and reports it. Removed debt cannot silently return.
 - **Never ratchets up.** Raising a baseline requires hand-editing the file — a visible, reviewable diff. The script cannot relax its own constraint to turn a failure green.
 
-Failure output names `file:line` for **new violations only**. A gate that prints 62 pre-existing problems on every failure trains the reader to ignore it.
+Failure output names `file:line` for **new violations only**. A gate that prints 89 pre-existing problems on every failure trains the reader to ignore it.
 
 ### 3. Tier 2 — visual review
 
@@ -162,8 +166,9 @@ A `Stop` hook was chosen over an npm script or a manually invoked skill because 
 
 Each criterion is pass/fail, not "it runs":
 
-1. `ds-check` on the current tree reports 62 / 9 / 7 / 0, matching hand-derived counts — confirms the checker measures accurately rather than merely executing.
-   A zero from `no-adhoc-input` specifically indicates the `[^>]*` bug, not a clean tree.
+1. `ds-check` on the current tree reports **69 / 9 / 11 / 0**, matching independently verified counts — confirms the checker measures accurately rather than merely executing.
+   A `no-adhoc-input` result of 0 indicates the `[^>]*` bug and 7 indicates line-based scanning; only 11 is correct.
+   `no-inline-style` is 0 *after* allowlisting; the raw occurrence count is 1 (`MacroDisplay.tsx:40`). If it reports 1, the allowlist is not wired.
 2. Introducing a deliberate `bg-green-600` fails the gate, naming that `file:line` and only that one.
 3. Converting one hand-rolled button to `Button` ratchets `no-bare-button` to 8 automatically.
 4. Hand-editing a baseline upward produces a visible diff and is not something the script performs.
@@ -173,6 +178,6 @@ Each criterion is pass/fail, not "it runs":
 
 - **Invariant 3 is unenforceable on arrival.** No `Input` primitive exists. The identical four-page input class string is a component that was never extracted. `ds-check` will report `no-adhoc-input` counts, but there is no sanctioned replacement to migrate toward. Extracting `Input` is follow-up work.
 - **Tier 2 depends on judgment.** Comparison-framed questions constrain it substantially, but it will not be perfectly repeatable across runs.
-- **Regex detection has known limits.** Class names assembled at runtime through template literals will evade `no-raw-palette`. `PlanPage.tsx:83` already builds classes this way. Multi-line JSX tags will evade `no-adhoc-input`. Accepted: the rules catch the common case, and the Tier 2 review is the backstop for the rest.
-- **The checker needs its own test.** A rule that matches nothing is indistinguishable from a clean codebase — the `[^>]*` bug above produces a confident green. The implementation must assert known-violation counts against the current tree, so a rule that silently stops matching fails loudly instead of passing.
+- **Regex detection has known limits.** Class names assembled at runtime through template literals still evade `no-raw-palette`; `PlanPage.tsx:83` already builds classes this way. Accepted: the rule catches the common case and Tier 2 is the backstop. (Multi-line JSX is *not* a gap — the brace-aware scanner handles it.)
+- **The checker needs its own test.** A rule that matches nothing is indistinguishable from a clean codebase. Three separate counting attempts during this design returned 0, 7, and 62 — every one of them ran without error. Each rule ships with a fixture test pinning expected counts, so a rule that silently stops matching fails loudly instead of passing.
 - **Scope is `features/` only.** Primitives may contain their own palette literals; that is out of scope here and worth a separate audit.
