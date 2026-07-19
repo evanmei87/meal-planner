@@ -715,13 +715,15 @@ function runGate(violations) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const violations = collectViolations()
   if (process.argv.includes('--gate')) runGate(violations)
   else if (process.argv.includes('--json')) console.log(JSON.stringify(countsOf(violations), null, 2))
   else reportToConsole(violations)
 }
 ```
+
+**Do not use `` `file://${process.argv[1].replace(/\\/g, '/')}` `` here.** Node's `import.meta.url` is `file:///C:/…` (three slashes) on Windows; that template produces `file://C:/…` (two). The comparison is then always false, the CLI block never runs, and `ds-check.mjs --gate` prints nothing and exits 0 — a permanently dead gate that is indistinguishable from a passing one. `pathToFileURL` is already imported in Task 4.
 
 The slice `violations[id].slice(-(now - was))` shows only the newly added violations rather than all 89, so the message stays readable.
 
