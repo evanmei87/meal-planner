@@ -16,7 +16,7 @@ Add a fifth tab, **Exercise**, showing the current week (Monday–Sunday) as a h
 | Week navigation | **None** — current week only | Matches the AC exactly (7 cells for the week containing today, no prev/next). Navigation is out of scope for this issue; can be a follow-up if wanted. |
 | Today-highlight color | **`bg-primary text-primary-foreground`** (via `Button variant="default"`), not the issue's literal `bg-green-600 text-white` example | [`docs/design-tokens.md`](../../design-tokens.md) already reserves this exact token for #28's today-highlight. The issue's inline example predates that doc section; the doc is the current source of truth. |
 | Date arithmetic | Local-timezone `Date` arithmetic (`getDay()`/`setDate()`) on a `T00:00:00`-anchored `Date`, not `toISOString()` | `toISOString()` converts to UTC first, shifting the calendar date whenever local time is behind UTC (true for all US zones) — a real bug against the EST requirement. `getDay()`/`setDate()` operate on the local calendar fields and are DST-safe for this use (no epoch-based day-skipping). |
-| Day-cell composition | `Card` (default padding) wrapping a full-width `Button` | AC requires `Card` for the cells; the design-system gate forbids bare `<button>` and requires `Button` for anything interactive. `Card` alone isn't clickable/keyboard-accessible, so `Button` is nested inside it as the actual control. `Card.tsx` concatenates classes with a plain template string (no `tailwind-merge`), so a `className="p-0"` override on `Card` isn't guaranteed to win the cascade over its built-in `p-4` — Tailwind's CSS output order depends on build-scan order, not class-attribute order. Keeping `Card`'s default padding and sizing `Button` to `w-full` inside it avoids that gamble entirely. |
+| Day-cell composition | `Card` (default padding) wrapping a `Button` | AC requires `Card` for the cells; the design-system gate forbids bare `<button>` and requires `Button` for anything interactive. `Card` alone isn't clickable/keyboard-accessible, so `Button` is nested inside it as the actual control. `Card.tsx` concatenates classes with a plain template string (no `tailwind-merge`), so a `className="p-0"` override on `Card` isn't guaranteed to win the cascade over its built-in `p-4` — Tailwind's CSS output order depends on build-scan order, not class-attribute order. Keeping `Card`'s default padding avoids that gamble entirely; `Button` is left at its default size rather than stretched, since nothing in the AC requires the cell to be full-bleed. |
 | Non-today button variant | `ghost`, not `outline` | `outline` draws its own `border-border`, which combined with `Card`'s own border produces a visible double-border a pixel apart. `ghost` has no border of its own, so `Card`'s border is the only one drawn. |
 | Initial `selectedDate` | Defaults to `getTodayInEST()` | The placeholder is populated on first render ("Exercises for {today}") rather than blank until a click. |
 | Selected-but-not-today styling | None | The AC only calls for a distinct style on the *today* cell. Clicking a non-today cell changes only the placeholder text, not the cell's appearance — avoids inventing an unspecified second visual state. |
@@ -57,10 +57,8 @@ const [selectedDate, setSelectedDate] = useState(today)
       <Button
         variant={day.date === today ? 'default' : 'ghost'}
         onClick={() => setSelectedDate(day.date)}
-        className="w-full flex-col gap-0.5 h-auto py-2"
       >
-        <span>{day.dayName.slice(0, 3)}</span>
-        <span>{formatShort(day.date)}</span>
+        {day.dayName.slice(0, 3)}, {formatShortDate(day.date)}
       </Button>
     </Card>
   ))}
@@ -68,7 +66,7 @@ const [selectedDate, setSelectedDate] = useState(today)
 <p>Exercises for {selectedDate}</p>
 ```
 
-`formatShort` is a small local helper defined in `ExerciseCalendarPage.tsx` (not exported from `dateUtils.ts`, which per the AC exports only `getTodayInEST` and `getCurrentWeekDates`). It renders e.g. "Jun 22" (`toLocaleDateString('en-US', { month: 'short', day: 'numeric' })`), combined with the 3-letter weekday to match the AC's "Mon, Jun 22" example. `dateUtils` itself keeps returning the full weekday name, as specified.
+`formatShortDate` is a small local helper defined in `ExerciseCalendarPage.tsx` (not exported from `dateUtils.ts`, which per the AC exports only `getTodayInEST` and `getCurrentWeekDates`). It renders e.g. "Jun 22" (`toLocaleDateString('en-US', { month: 'short', day: 'numeric' })`), joined with the 3-letter weekday into a **single string** ("Mon, Jun 22") matching the AC's example. This is deliberately one string, not two `<span>`s: text nodes concatenate with no separator for the accessible name, so `<span>Mon</span><span>Jun 22</span>` would read as "MonJun 22" to assistive tech and to `getByRole` queries, silently dropping the comma. `dateUtils` itself keeps returning the full weekday name, as specified.
 
 ### 4.3 Nav & routing
 
