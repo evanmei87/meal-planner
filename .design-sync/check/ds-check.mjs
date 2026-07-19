@@ -5,6 +5,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { RULES } from './lib/rules.mjs'
 import { scopedFiles } from './lib/files.mjs'
+import { reviewIsStale } from './lib/stamp.mjs'
 
 export { scopedFiles }
 
@@ -97,6 +98,12 @@ function runGate(violations) {
     }
     writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`)
     console.log('Updated .design-sync/check/baseline.json — commit it with your change.')
+  }
+
+  // Advisory only — never exits non-zero. Tier 2 needs servers, a browser and
+  // judgment, so a hook can report that review is overdue but cannot perform it.
+  if (reviewIsStale()) {
+    console.log('Tier 2 visual review is stale — page styling changed since the last /ds-review.')
   }
 }
 
