@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, globSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { RULES } from './lib/rules.mjs'
@@ -44,6 +45,16 @@ export function evaluateGate(counts, baseline) {
   return { ok: regressions.length === 0, regressions, improvements }
 }
 
+/** Repo-relative paths of files changed vs HEAD, or null if git is unavailable. */
+function changedFiles() {
+  try {
+    const out = execFileSync('git', ['diff', '--name-only', 'HEAD'], { encoding: 'utf8' })
+    return new Set(out.split('\n').map((line) => line.trim()).filter(Boolean))
+  } catch {
+    return null
+  }
+}
+
 function reportToConsole(violations) {
   const counts = countsOf(violations)
   for (const rule of RULES) {
@@ -59,11 +70,20 @@ function runGate(violations) {
 
   if (!ok) {
     console.error('Design system check failed — new violations introduced.\n')
+    const changed = changedFiles()
     for (const { id, was, now } of regressions) {
       const rule = RULES.find((r) => r.id === id)
       console.error(`  ${id}: ${was} -> ${now}  (${rule?.describe ?? 'unknown rule'})`)
-      for (const hit of violations[id].slice(-(now - was))) {
-        console.error(`    ${hit.file}:${hit.line}  ${hit.text}`)
+      const localized = changed ? violations[id].filter((hit) => changed.has(hit.file)) : []
+      if (localized.length > 0) {
+        console.error('    New violations in files you changed:')
+        for (const hit of localized) {
+          console.error(`    ${hit.file}:${hit.line}  ${hit.text}`)
+        }
+      } else {
+        console.error(
+          `    Could not localize the new violation(s). Run \`node .design-sync/check/ds-check.mjs\` to see all ${now} locations for this rule.`,
+        )
       }
     }
     console.error('\nSee .design-sync/north-star.md for the invariants.')
