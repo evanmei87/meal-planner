@@ -26,7 +26,7 @@ test('handles nested braces inside a braced className', () => {
 test('collapses whitespace so reformatting does not count as visual change', () => {
   const inline = extractClassNames('<div className={cn("a", "b")} />')
   const wrapped = extractClassNames('<div className={cn(\n  "a",\n  "b",\n)} />')
-  assert.equal(inline[0].replace(/,\s*\)/, ')'), wrapped[0].replace(/,\s*\)/, ')'))
+  assert.equal(inline[0], wrapped[0], 'reformatting must not change the extracted value')
 })
 
 test('ignores non-className attributes', () => {

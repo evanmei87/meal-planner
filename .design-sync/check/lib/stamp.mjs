@@ -29,6 +29,7 @@ export function extractClassNames(src) {
           .replace(/\s+/g, ' ')
           .replace(/\(\s+/g, '(')
           .replace(/\s+\)/g, ')')
+          .replace(/,\s*\)/g, ')')
       )
     }
   }
@@ -52,7 +53,13 @@ export function currentStamp() {
 
 export function readStamp() {
   if (!existsSync(STAMP_PATH)) return null
-  return JSON.parse(readFileSync(STAMP_PATH, 'utf8')).stamp ?? null
+  // A corrupt/truncated stamp file must degrade to "never reviewed" (stale)
+  // rather than throw, since this runs on a Stop hook every turn.
+  try {
+    return JSON.parse(readFileSync(STAMP_PATH, 'utf8')).stamp ?? null
+  } catch {
+    return null
+  }
 }
 
 export function writeStamp(hash) {
