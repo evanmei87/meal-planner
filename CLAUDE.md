@@ -53,6 +53,18 @@ Frontend files live exclusively under `web/` — never add them to the Python `s
 - `web/src/features/` — four feature directories (`plan/`, `meals/`, `groceries/`, `state/`), each with a `Page.tsx` and `hooks.ts`. Hooks use TanStack Query.
 - TanStack Query keys: `['plan']`, `['meals']`, `['meals', 'search', params]`, `['state']`.
 
+### Design System
+
+Before writing or editing anything under `web/src/features/`, read `.design-sync/north-star.md`. It holds every design invariant and is the single source for them.
+
+Tier 1 invariants are enforced automatically: a `Stop` hook runs `node .design-sync/check/ds-check.mjs --gate` and fails the turn if any violation count rises above `.design-sync/check/baseline.json`. Fix new violations rather than raising the baseline — the baseline only ever moves down, automatically, and a manual increase is a reviewable change requiring justification.
+
+Tier 2 invariants are visual and cannot be linted, so they are not gated. Instead the hook reports when `/ds-review` is overdue — that is, when `className` values in `web/src/features/` changed since the last review.
+
+**When the hook reports Tier 2 is stale, offer the review** — do not silently skip it and do not run it unprompted. Raise it at a natural boundary: before committing or pushing, or when reporting a chunk of visual work complete. Say that Tier 1 passed, that Tier 2 is overdue, and ask whether to run `/ds-review`. It needs both servers and a browser session, so it is the user's call, but the offer is not optional.
+
+To check on demand: `node .design-sync/check/ds-check.mjs`
+
 ### Meal Generation Pipeline
 
 1. Load `state.json` + static data files
