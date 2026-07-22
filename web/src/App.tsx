@@ -14,6 +14,14 @@ export function App() {
             Plan
           </NavLink>
           <NavLink
+            to="/exercise"
+            className={({ isActive }) =>
+              isActive ? 'text-green-600' : 'text-gray-600 hover:text-green-600'
+            }
+          >
+            Exercise
+          </NavLink>
+          <NavLink
             to="/meals"
             className={({ isActive }) =>
               isActive ? 'text-green-600' : 'text-gray-600 hover:text-green-600'

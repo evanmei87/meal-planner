@@ -42,6 +42,6 @@ web/dist/
 web/.env
 
 # --- Design Sync ---
-.ds-sync/        # installed build tooling (like node_modules)
-ds-bundle/       # generated output (like dist/)
-.design-sync/.cache/  # grading cache and screenshots
+.ds-sync/ 
+ds-bundle/
+.design-sync/.cache/

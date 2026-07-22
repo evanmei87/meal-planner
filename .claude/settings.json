@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .design-sync/check/ds-check.mjs --gate"
+          }
+        ]
+      }
+    ]
+  }
+}
