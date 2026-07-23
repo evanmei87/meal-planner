@@ -15,6 +15,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/ui/button'
 import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
+import { BlurFade } from '@/components/magicui/BlurFade'
 import { ApiError } from '@/api/client'
 import { getTodayInEST, getCurrentWeekDates } from '@/features/exercise/dateUtils'
 import {
@@ -321,50 +322,52 @@ export function ExerciseCalendarPage() {
           ))}
         </ul>
 
-        {!selectedDay || sortedExercises.length === 0 ? (
-          <p className="text-sm text-muted-foreground mb-4">No exercises logged for this day.</p>
-        ) : (
-          <>
-            <SortableContext items={sortedExercises.map((e) => e.id)} strategy={verticalListSortingStrategy}>
-              <ul className="mb-3 space-y-1">
-                {sortedExercises.map((exercise) => (
-                  <SortableExerciseRow key={exercise.id} exercise={exercise}>
-                    <span>{formatExerciseSummary(exercise)}</span>
-                    {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => handleEditClick(exercise)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="xs"
-                      onClick={() => handleRemoveClick(exercise)}
-                    >
-                      Remove
-                    </Button>
-                  </SortableExerciseRow>
-                ))}
-              </ul>
-            </SortableContext>
-            <div className="flex items-center gap-2 mb-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={handleSavePreset}
-                disabled={savePreset.isPending}
-              >
-                {savePreset.isPending ? 'Saving…' : 'Save to preset'}
-              </Button>
-              {presetSaved && <span className="text-xs text-muted-foreground">Saved!</span>}
-            </div>
-          </>
-        )}
+        <BlurFade transitionKey={selectedDate}>
+          {!selectedDay || sortedExercises.length === 0 ? (
+            <p className="text-sm text-muted-foreground mb-4">No exercises logged for this day.</p>
+          ) : (
+            <>
+              <SortableContext items={sortedExercises.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+                <ul className="mb-3 space-y-1">
+                  {sortedExercises.map((exercise) => (
+                    <SortableExerciseRow key={exercise.id} exercise={exercise}>
+                      <span>{formatExerciseSummary(exercise)}</span>
+                      {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => handleEditClick(exercise)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="xs"
+                        onClick={() => handleRemoveClick(exercise)}
+                      >
+                        Remove
+                      </Button>
+                    </SortableExerciseRow>
+                  ))}
+                </ul>
+              </SortableContext>
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={handleSavePreset}
+                  disabled={savePreset.isPending}
+                >
+                  {savePreset.isPending ? 'Saving…' : 'Save to preset'}
+                </Button>
+                {presetSaved && <span className="text-xs text-muted-foreground">Saved!</span>}
+              </div>
+            </>
+          )}
+        </BlurFade>
 
         <form onSubmit={handleSubmit} className="flex gap-2 flex-wrap items-end">
           <div>
