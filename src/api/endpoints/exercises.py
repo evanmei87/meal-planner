@@ -13,6 +13,7 @@ from src.api.models import (
     _require_fields_for_exercise_type,
 )
 from src.tools.calculate_exercise_calories import estimate_calories
+from src.tools.exercise_presets import apply_presets_to_week, load_presets
 from src.tools.exercise_storage import (
     add_exercise,
     delete_exercise,
@@ -26,6 +27,7 @@ from src.tools.exercise_storage import (
 router = APIRouter(prefix="/exercises", tags=["Exercises"])
 
 SCHEDULE_PATH = Path(__file__).parent.parent.parent / 'state' / 'exercise_schedule.json'
+PRESETS_PATH = Path(__file__).parent.parent.parent / 'state' / 'exercise_presets.json'
 
 
 def _current_week_start_est() -> str:
@@ -48,7 +50,8 @@ async def get_exercise_week(
                     to the Monday of the current server week.
 
     Returns:
-        ExerciseWeekResponse with 7 days, empty for dates with no exercises.
+        ExerciseWeekResponse with 7 days. Days with no stored exercises
+        are pre-filled from that day-of-week's saved preset, if any.
 
     Example:
         GET /exercises/?week_start=2026-06-22
@@ -59,6 +62,9 @@ async def get_exercise_week(
 
         data = load_schedule(Path(SCHEDULE_PATH))
         days = get_week(data, week_start)
+
+        presets = load_presets(Path(PRESETS_PATH))
+        days = apply_presets_to_week(days, presets)
 
         return ExerciseWeekResponse(week_start=week_start, days=days)
     except Exception as e:

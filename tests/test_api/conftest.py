@@ -52,6 +52,18 @@ def temp_schedule_file():
 
 
 @pytest.fixture
+def temp_presets_file():
+    """Create a temporary exercise presets file for testing."""
+    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+    temp_file.write(json.dumps({'presets': {}}, indent=2))
+    temp_file.close()
+
+    yield temp_file.name
+
+    Path(temp_file.name).unlink(missing_ok=True)
+
+
+@pytest.fixture
 def sample_day_plan():
     """Sample day plan for testing."""
     return {

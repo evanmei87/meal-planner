@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -375,3 +377,35 @@ def test_delete_exercise_invalid_api_key(client):
     )
 
     assert response.status_code == 401
+
+
+def test_get_exercise_week_fills_day_with_no_stored_data_from_preset(
+    client, api_key_headers, temp_schedule_file, temp_presets_file
+):
+    Path(temp_presets_file).write_text(json.dumps({
+        "presets": {"Monday": [{
+            "type": "running", "distance_miles": 3.1, "duration_minutes": 28,
+            "sets": None, "reps": None, "notes": "easy run",
+        }]}
+    }))
+
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file), \
+         patch('src.api.endpoints.exercises.PRESETS_PATH', temp_presets_file), \
+         patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+        mock_get_user_stats.return_value = {"weight_kg": 70.0}
+        response = client.get(
+            "/exercises/?week_start=2026-06-22",
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 200
+    monday = response.json()["days"][0]
+    assert monday["day_name"] == "Monday"
+    assert len(monday["exercises"]) == 1
+    filled = monday["exercises"][0]
+    assert filled["type"] == "running"
+    assert filled["distance_miles"] == 3.1
+    assert filled["calories"] == round(70.0 * 3.1 * 1.668)
+    assert filled["notes"] == "easy run"
+    assert filled["id"]
+    assert monday["total_calories"] == filled["calories"]
