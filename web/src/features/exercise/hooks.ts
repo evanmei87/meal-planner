@@ -11,6 +11,10 @@ export function useExerciseWeek(weekStart: string) {
   return useQuery({ queryKey: ['exercises', weekStart], queryFn: () => api.exercises.getWeek(weekStart) })
 }
 
+export function useExerciseMonth(month: string) {
+  return useQuery({ queryKey: ['exercises', 'month', month], queryFn: () => api.exercises.getMonth(month) })
+}
+
 export function useAddExercise(weekStart: string) {
   const qc = useQueryClient()
   return useMutation({

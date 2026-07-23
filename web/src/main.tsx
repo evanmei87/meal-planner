@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '@/App'
 import { PlanPage } from '@/features/plan/PlanPage'
 import { ExerciseCalendarPage } from '@/features/exercise/ExerciseCalendarPage'
+import { ExerciseMonthPage } from '@/features/exercise/ExerciseMonthPage'
 import { MealsPage } from '@/features/meals/MealsPage'
 import { MealDetailPage } from '@/features/meals/MealDetailPage'
 import { GroceriesPage } from '@/features/groceries/GroceriesPage'
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route index element={<Navigate to="/plan" replace />} />
             <Route path="plan" element={<PlanPage />} />
             <Route path="exercise" element={<ExerciseCalendarPage />} />
+            <Route path="exercise/month" element={<ExerciseMonthPage />} />
             <Route path="meals" element={<MealsPage />} />
             <Route path="meals/:name" element={<MealDetailPage />} />
             <Route path="groceries" element={<GroceriesPage />} />

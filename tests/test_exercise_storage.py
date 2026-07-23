@@ -8,6 +8,7 @@ from tools.exercise_storage import (
     add_exercise,
     delete_exercise,
     find_exercise_date,
+    get_month,
     get_week,
     load_schedule,
     reorder_exercises,
@@ -60,6 +61,49 @@ def test_get_week_includes_stored_day_entry():
     week = get_week({"days": {"2026-06-23": stored_day}}, "2026-06-22")
 
     assert week[1] == stored_day
+
+
+def test_get_month_returns_correct_number_of_days_for_30_day_month():
+    month = get_month({"days": {}}, "2026-06")
+
+    assert len(month) == 30
+    assert month[0]["date"] == "2026-06-01"
+    assert month[-1]["date"] == "2026-06-30"
+    assert all(day["exercises"] == [] and day["total_calories"] == 0 for day in month)
+
+
+def test_get_month_returns_correct_number_of_days_for_31_day_month():
+    month = get_month({"days": {}}, "2026-07")
+
+    assert len(month) == 31
+    assert month[0]["date"] == "2026-07-01"
+    assert month[-1]["date"] == "2026-07-31"
+
+
+def test_get_month_returns_29_days_for_leap_year_february():
+    month = get_month({"days": {}}, "2028-02")
+
+    assert len(month) == 29
+    assert month[-1]["date"] == "2028-02-29"
+
+
+def test_get_month_returns_28_days_for_non_leap_year_february():
+    month = get_month({"days": {}}, "2026-02")
+
+    assert len(month) == 28
+    assert month[-1]["date"] == "2026-02-28"
+
+
+def test_get_month_includes_stored_day_entry():
+    stored_day = {
+        "date": "2026-06-15",
+        "day_name": "Monday",
+        "exercises": [{"id": "abc", "type": "running"}],
+        "total_calories": 0,
+    }
+    month = get_month({"days": {"2026-06-15": stored_day}}, "2026-06")
+
+    assert month[14] == stored_day
 
 
 def test_add_exercise_creates_date_entry_and_appends():

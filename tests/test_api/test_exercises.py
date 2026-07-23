@@ -20,6 +20,89 @@ def test_get_exercise_week_no_file_returns_seven_empty_days(client, api_key_head
     assert data["days"][0]["total_calories"] == 0
 
 
+def test_get_exercise_month_no_file_returns_all_days_of_month(client, api_key_headers):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', '/nonexistent/path/exercise_schedule.json'):
+        response = client.get(
+            "/exercises/?month=2026-06",
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["month"] == "2026-06"
+    assert len(data["days"]) == 30
+    assert data["days"][0]["date"] == "2026-06-01"
+    assert data["days"][-1]["date"] == "2026-06-30"
+    assert data["days"][0]["exercises"] == []
+    assert data["days"][0]["total_calories"] == 0
+
+
+def test_get_exercise_month_leap_year_february_returns_29_days(client, api_key_headers):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', '/nonexistent/path/exercise_schedule.json'):
+        response = client.get(
+            "/exercises/?month=2028-02",
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["days"]) == 29
+    assert data["days"][-1]["date"] == "2028-02-29"
+
+
+def test_get_exercise_month_includes_previously_added_exercise(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            client.post(
+                "/exercises/",
+                json={"date": "2026-06-15", "distance_miles": 3.1, "duration_minutes": 28},
+                headers=api_key_headers
+            )
+
+            month_response = client.get("/exercises/?month=2026-06", headers=api_key_headers)
+
+    assert month_response.status_code == 200
+    day = next(d for d in month_response.json()["days"] if d["date"] == "2026-06-15")
+    assert len(day["exercises"]) == 1
+    assert day["total_calories"] > 0
+
+
+def test_get_exercise_month_fills_empty_days_from_preset(
+    client, api_key_headers, temp_schedule_file, temp_presets_file
+):
+    Path(temp_presets_file).write_text(json.dumps({
+        "presets": {"Monday": [{
+            "type": "running", "distance_miles": 3.1, "duration_minutes": 28,
+            "sets": None, "reps": None, "notes": "easy run",
+        }]}
+    }))
+
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file), \
+         patch('src.api.endpoints.exercises.PRESETS_PATH', temp_presets_file), \
+         patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+        mock_get_user_stats.return_value = {"weight_kg": 70.0}
+        response = client.get(
+            "/exercises/?month=2026-06",
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 200
+    # 2026-06-01 is a Monday.
+    monday = next(d for d in response.json()["days"] if d["date"] == "2026-06-01")
+    assert len(monday["exercises"]) == 1
+    assert monday["exercises"][0]["notes"] == "easy run"
+
+
+def test_get_exercise_month_invalid_api_key(client):
+    response = client.get(
+        "/exercises/?month=2026-06",
+        headers={"X-API-Key": "invalid-key"}
+    )
+
+    assert response.status_code == 401
+
+
 def test_add_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
     with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
         with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:

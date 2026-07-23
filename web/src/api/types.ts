@@ -120,6 +120,11 @@ export interface ExerciseWeekResponse {
   days: ExerciseDayPlan[]
 }
 
+export interface ExerciseMonthResponse {
+  month: string
+  days: ExerciseDayPlan[]
+}
+
 export interface AddExerciseRequest {
   date: string
   type: ExerciseType

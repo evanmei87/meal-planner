@@ -1,13 +1,14 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.models import (
     AddExerciseRequest,
     ExerciseItem,
+    ExerciseMonthResponse,
     ExerciseWeekResponse,
     ReorderExercisesRequest,
     UpdateExerciseRequest,
@@ -20,6 +21,7 @@ from src.tools.exercise_storage import (
     delete_exercise,
     find_exercise_date,
     get_exercise,
+    get_month,
     get_week,
     load_schedule,
     reorder_exercises,
@@ -41,49 +43,74 @@ def _current_week_start_est() -> str:
     return monday.strftime('%Y-%m-%d')
 
 
-@router.get("/", response_model=ExerciseWeekResponse)
-async def get_exercise_week(
-    week_start: Optional[str] = Query(None, description="ISO date of the Monday to start the week from")
+def _persist_preset_filled_days(schedule_path: Path, data: dict, days: list[dict], stored_dates: set[str]) -> None:
+    """
+    Persist days that apply_presets_to_week filled in from a preset.
+
+    Without this, a preset-filled day would be regenerated fresh (with a
+    new id) on every request, so it could never be edited or deleted.
+    Persisting it once makes it behave like any other real, editable data
+    from then on.
+    """
+    newly_filled_days = [day for day in days if day["date"] not in stored_dates and day["exercises"]]
+    if newly_filled_days:
+        for day in newly_filled_days:
+            data.setdefault("days", {})[day["date"]] = day
+        save_schedule(schedule_path, data)
+
+
+@router.get("/", response_model=Union[ExerciseWeekResponse, ExerciseMonthResponse])
+async def get_exercise_schedule(
+    week_start: Optional[str] = Query(None, description="ISO date of the Monday to start the week from"),
+    month: Optional[str] = Query(
+        None, description="ISO year-month (YYYY-MM) to return the whole month for, instead of a single week"
+    ),
 ):
     """
-    Get a week's exercise schedule.
+    Get a week's or a month's exercise schedule.
 
     Args:
         week_start: ISO date of the Monday to start the week from. Defaults
-                    to the Monday of the current server week.
+                    to the Monday of the current server week. Ignored if
+                    month is given.
+        month: ISO year-month (YYYY-MM). When given, returns every calendar
+               date in that month instead of a single week.
 
     Returns:
-        ExerciseWeekResponse with 7 days. Days with no entry in storage
-        are pre-filled from that day-of-week's saved preset, if any. A
-        day filled this way is persisted immediately, so it behaves like
-        any other real, editable/deletable data from then on — including
-        staying empty on later requests if the user deletes everything
-        the preset filled in.
+        ExerciseMonthResponse when month is given, otherwise
+        ExerciseWeekResponse. Days with no entry in storage are pre-filled
+        from that day-of-week's saved preset, if any. A day filled this
+        way is persisted immediately, so it behaves like any other real,
+        editable/deletable data from then on — including staying empty on
+        later requests if the user deletes everything the preset filled
+        in.
 
     Example:
         GET /exercises/?week_start=2026-06-22
+        GET /exercises/?month=2026-06
     """
     try:
+        schedule_path = Path(SCHEDULE_PATH)
+        data = load_schedule(schedule_path)
+        stored_dates = set(data.get("days", {}).keys())
+        presets = load_presets(Path(PRESETS_PATH))
+
+        if month is not None:
+            days = get_month(data, month)
+            days = apply_presets_to_week(days, presets, stored_dates)
+            _persist_preset_filled_days(schedule_path, data, days, stored_dates)
+            return ExerciseMonthResponse(month=month, days=days)
+
         if week_start is None:
             week_start = _current_week_start_est()
 
-        schedule_path = Path(SCHEDULE_PATH)
-        data = load_schedule(schedule_path)
         days = get_week(data, week_start)
-        stored_dates = set(data.get("days", {}).keys())
-
-        presets = load_presets(Path(PRESETS_PATH))
         days = apply_presets_to_week(days, presets, stored_dates)
-
-        newly_filled_days = [day for day in days if day["date"] not in stored_dates and day["exercises"]]
-        if newly_filled_days:
-            for day in newly_filled_days:
-                data.setdefault("days", {})[day["date"]] = day
-            save_schedule(schedule_path, data)
+        _persist_preset_filled_days(schedule_path, data, days, stored_dates)
 
         return ExerciseWeekResponse(week_start=week_start, days=days)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve exercise week: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve exercise schedule: {str(e)}")
 
 
 @router.post("/", response_model=ExerciseItem)

@@ -1,3 +1,4 @@
+import calendar
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -78,6 +79,36 @@ def get_week(data: dict, week_start: str) -> list[dict]:
         week.append(day)
 
     return week
+
+
+def get_month(data: dict, month: str) -> list[dict]:
+    """
+    Build every calendar date of a month.
+
+    Args:
+        data: Schedule data as returned by load_schedule
+        month: ISO year-month to build, e.g. "2026-06"
+
+    Returns:
+        List of day dicts shaped like get_week's entries, one per calendar
+        date in the month, in date order. Dates not present in storage are
+        returned as empty days. total_calories is recomputed from each
+        day's exercises so it never drifts from the stored per-exercise
+        values. Uses calendar.monthrange for the day count, so leap-year
+        February correctly returns 29 days.
+    """
+    days = data.get("days", {})
+    year, month_number = (int(part) for part in month.split("-"))
+    _, days_in_month = calendar.monthrange(year, month_number)
+
+    result = []
+    for day_of_month in range(1, days_in_month + 1):
+        date = f"{year:04d}-{month_number:02d}-{day_of_month:02d}"
+        day = days[date] if date in days else _empty_day(date)
+        day["total_calories"] = sum(exercise.get("calories", 0) for exercise in day["exercises"])
+        result.append(day)
+
+    return result
 
 
 def add_exercise(data: dict, date: str, exercise: dict) -> dict:
