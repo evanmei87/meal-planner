@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { ExerciseCalendarPage } from './ExerciseCalendarPage'
 import type {
   AddExerciseRequest,
@@ -55,7 +56,9 @@ function renderExercisePage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <ExerciseCalendarPage />
+      <MemoryRouter>
+        <ExerciseCalendarPage />
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }
@@ -87,6 +90,13 @@ describe('ExerciseCalendarPage', () => {
 
     const notToday = screen.getByRole('button', { name: 'Mon, Jun 22' })
     expect(notToday.className).not.toContain('bg-primary')
+  })
+
+  it('links to the month view', async () => {
+    server.use(http.get('http://localhost/api/exercises/', () => HttpResponse.json(emptyWeek())))
+    renderExercisePage()
+    await screen.findByRole('button', { name: 'Wed, Jun 24' })
+    expect(screen.getByRole('link', { name: 'Month view' })).toHaveAttribute('href', '/exercise/month')
   })
 
   it('shows a placeholder for a day with no exercises', async () => {

@@ -4,6 +4,7 @@ import type {
   AddMealResponse,
   AppState,
   ExerciseItem,
+  ExerciseMonthResponse,
   ExerciseWeekResponse,
   GroceriesResponse,
   MealPlanRequest,
@@ -92,6 +93,8 @@ export const api = {
   exercises: {
     getWeek: (weekStart: string) =>
       request<ExerciseWeekResponse>(`/exercises/?week_start=${weekStart}`),
+    getMonth: (month: string) =>
+      request<ExerciseMonthResponse>(`/exercises/?month=${month}`),
     add: (body: AddExerciseRequest) =>
       request<ExerciseItem>('/exercises/', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: UpdateExerciseRequest) =>

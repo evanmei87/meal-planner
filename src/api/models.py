@@ -191,6 +191,12 @@ class ExerciseWeekResponse(BaseModel):
     days: List[ExerciseDayPlan] = Field(default_factory=list)
 
 
+class ExerciseMonthResponse(BaseModel):
+    """A full calendar month of exercise days, keyed by real calendar dates."""
+    month: str
+    days: List[ExerciseDayPlan] = Field(default_factory=list)
+
+
 class AddExerciseRequest(BaseModel):
     """Request to add an exercise to a given date."""
     date: str

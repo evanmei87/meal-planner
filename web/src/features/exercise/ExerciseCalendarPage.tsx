@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   DndContext,
   PointerSensor,
@@ -284,6 +285,11 @@ export function ExerciseCalendarPage() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
     <div>
+      <div className="flex justify-end mb-2">
+        <Link to="/exercise/month" className="text-sm text-primary hover:underline">
+          Month view
+        </Link>
+      </div>
       <div className="flex gap-2 mb-4 flex-wrap">
         {week.map((day) => {
           const badge = dayBadge(data?.days.find((d) => d.date === day.date))
