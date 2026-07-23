@@ -174,6 +174,14 @@ class AddExerciseRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class UpdateExerciseRequest(BaseModel):
+    """Request to update an existing exercise. The exercise stays on its
+    existing day — moving it to a different day is out of scope here."""
+    distance_miles: float = Field(..., gt=0)
+    duration_minutes: float = Field(..., gt=0)
+    notes: Optional[str] = None
+
+
 class GroceriesRequest(BaseModel):
     """Request to parse natural-language grocery text."""
     text: str = Field(..., min_length=1, description="Natural language grocery description")
