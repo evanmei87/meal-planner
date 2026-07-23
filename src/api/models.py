@@ -142,6 +142,38 @@ class ErrorResponse(BaseModel):
     details: Optional[str] = None
 
 
+class ExerciseItem(BaseModel):
+    """Individual exercise entry (MVP: running only)."""
+    id: str
+    type: Literal["running"] = "running"
+    distance_miles: float = Field(..., gt=0)
+    duration_minutes: float = Field(..., gt=0)
+    calories: int = 0
+    notes: Optional[str] = None
+
+
+class ExerciseDayPlan(BaseModel):
+    """Scheduled exercises for a single calendar date."""
+    date: str
+    day_name: str
+    exercises: List[ExerciseItem] = Field(default_factory=list)
+    total_calories: int = 0
+
+
+class ExerciseWeekResponse(BaseModel):
+    """A week of exercise days, keyed by real calendar dates."""
+    week_start: str
+    days: List[ExerciseDayPlan] = Field(default_factory=list)
+
+
+class AddExerciseRequest(BaseModel):
+    """Request to add a running exercise to a given date."""
+    date: str
+    distance_miles: float = Field(..., gt=0)
+    duration_minutes: float = Field(..., gt=0)
+    notes: Optional[str] = None
+
+
 class GroceriesRequest(BaseModel):
     """Request to parse natural-language grocery text."""
     text: str = Field(..., min_length=1, description="Natural language grocery description")
