@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ExerciseCalendarPage } from './ExerciseCalendarPage'
-import type { ExerciseWeekResponse } from '@/api/types'
+import type { AddExerciseRequest, ExerciseWeekResponse } from '@/api/types'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -94,7 +94,7 @@ describe('ExerciseCalendarPage', () => {
     server.use(http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)))
     renderExercisePage()
 
-    await screen.findByText('2 runs · 820 cal')
+    await screen.findByText('2 exercises · 820 cal')
     expect(screen.getByText('3.1 mi · 28 min · 320 cal')).toBeInTheDocument()
     expect(screen.getByText(/Easy pace/)).toBeInTheDocument()
     expect(screen.getByText('5 mi · 45 min · 500 cal')).toBeInTheDocument()
@@ -140,6 +140,93 @@ describe('ExerciseCalendarPage', () => {
 
     await screen.findByText('3.1 mi · 28 min · 400 cal')
     expect(screen.queryByText('No exercises logged for this day.')).not.toBeInTheDocument()
+  })
+
+  it('submitting a walking exercise posts distance and no sets/reps', async () => {
+    let week = emptyWeek()
+    let postedBody: AddExerciseRequest | undefined
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.post('http://localhost/api/exercises/', async ({ request }) => {
+        const body = (await request.json()) as AddExerciseRequest
+        postedBody = body
+        const newExercise = {
+          id: 'new-walk',
+          type: 'walking' as const,
+          distance_miles: body.distance_miles,
+          duration_minutes: body.duration_minutes,
+          calories: 150,
+          notes: null,
+        }
+        week = {
+          ...week,
+          days: week.days.map((d) =>
+            d.date === body.date
+              ? { ...d, exercises: [...d.exercises, newExercise], total_calories: d.total_calories + newExercise.calories }
+              : d
+          ),
+        }
+        return HttpResponse.json(newExercise)
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('No exercises logged for this day.')
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'walking' } })
+    fireEvent.change(screen.getByLabelText('Distance (mi)'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Duration (min)'), { target: { value: '30' } })
+    fireEvent.click(screen.getByRole('button', { name: /add exercise/i }))
+
+    await screen.findByText('2 mi · 30 min · 150 cal')
+    expect(postedBody).toMatchObject({ type: 'walking', distance_miles: 2, duration_minutes: 30 })
+    expect(postedBody?.sets).toBeUndefined()
+    expect(postedBody?.reps).toBeUndefined()
+  })
+
+  it('submitting a strength exercise posts sets/reps and no distance', async () => {
+    let week = emptyWeek()
+    let postedBody: AddExerciseRequest | undefined
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.post('http://localhost/api/exercises/', async ({ request }) => {
+        const body = (await request.json()) as AddExerciseRequest
+        postedBody = body
+        const newExercise = {
+          id: 'new-strength',
+          type: 'strength' as const,
+          sets: body.sets,
+          reps: body.reps,
+          duration_minutes: body.duration_minutes,
+          calories: 180,
+          notes: null,
+        }
+        week = {
+          ...week,
+          days: week.days.map((d) =>
+            d.date === body.date
+              ? { ...d, exercises: [...d.exercises, newExercise], total_calories: d.total_calories + newExercise.calories }
+              : d
+          ),
+        }
+        return HttpResponse.json(newExercise)
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('No exercises logged for this day.')
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'strength' } })
+    expect(screen.queryByLabelText('Distance (mi)')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Sets'), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('Reps'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Duration (min)'), { target: { value: '20' } })
+    fireEvent.click(screen.getByRole('button', { name: /add exercise/i }))
+
+    await screen.findByText('3 sets × 10 reps · 20 min · 180 cal')
+    expect(postedBody).toMatchObject({ type: 'strength', sets: 3, reps: 10, duration_minutes: 20 })
+    expect(postedBody?.distance_miles).toBeUndefined()
   })
 
   it('editing an exercise pre-fills the form and the row reflects the new values after save', async () => {

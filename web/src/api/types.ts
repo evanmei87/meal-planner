@@ -94,11 +94,15 @@ export interface GroceriesResponse {
   review_count: number
 }
 
+export type ExerciseType = 'running' | 'walking' | 'biking' | 'swimming' | 'strength'
+
 export interface ExerciseItem {
   id: string
-  type: 'running'
-  distance_miles: number
+  type: ExerciseType
+  distance_miles?: number | null
   duration_minutes: number
+  sets?: number | null
+  reps?: number | null
   calories: number
   notes?: string | null
 }
@@ -117,14 +121,20 @@ export interface ExerciseWeekResponse {
 
 export interface AddExerciseRequest {
   date: string
-  distance_miles: number
+  type: ExerciseType
+  distance_miles?: number
   duration_minutes: number
+  sets?: number
+  reps?: number
   notes?: string
 }
 
 export interface UpdateExerciseRequest {
-  distance_miles: number
+  type?: ExerciseType
+  distance_miles?: number
   duration_minutes: number
+  sets?: number
+  reps?: number
   notes?: string
 }
 
