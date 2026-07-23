@@ -230,6 +230,27 @@ class UpdateExerciseRequest(BaseModel):
         return self
 
 
+class PresetExerciseItem(BaseModel):
+    """A single exercise within a day-of-week preset (no id/date/calories —
+    presets are a reusable template, not a scheduled instance)."""
+    type: ExerciseType = "running"
+    distance_miles: Optional[float] = Field(None, gt=0)
+    duration_minutes: float = Field(..., gt=0)
+    sets: Optional[int] = Field(None, gt=0)
+    reps: Optional[int] = Field(None, gt=0)
+    notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_required_fields_for_type(self) -> "PresetExerciseItem":
+        _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
+        return self
+
+
+class ExercisePresetsResponse(BaseModel):
+    """Full presets map, keyed by day-of-week name."""
+    presets: dict[str, List[PresetExerciseItem]] = Field(default_factory=dict)
+
+
 class GroceriesRequest(BaseModel):
     """Request to parse natural-language grocery text."""
     text: str = Field(..., min_length=1, description="Natural language grocery description")
