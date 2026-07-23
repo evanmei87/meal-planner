@@ -117,6 +117,24 @@ def find_exercise_date(data: dict, exercise_id: str) -> Optional[str]:
     return None
 
 
+def get_exercise(data: dict, exercise_id: str) -> Optional[dict]:
+    """
+    Find the stored exercise dict with the given id.
+
+    Args:
+        data: Schedule data as returned by load_schedule
+        exercise_id: id of the exercise to look for
+
+    Returns:
+        The exercise dict, or None if no exercise with that id exists.
+    """
+    for day in data.get("days", {}).values():
+        for exercise in day["exercises"]:
+            if exercise["id"] == exercise_id:
+                return exercise
+    return None
+
+
 def update_exercise(data: dict, exercise_id: str, updates: dict) -> Optional[dict]:
     """
     Apply updates to an existing exercise, in place.

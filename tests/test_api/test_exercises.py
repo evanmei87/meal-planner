@@ -44,6 +44,197 @@ def test_add_exercise_returns_created_item(client, api_key_headers, temp_schedul
     assert data["id"]
 
 
+def test_add_walking_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "type": "walking",
+                    "distance_miles": 2.0,
+                    "duration_minutes": 30,
+                },
+                headers=api_key_headers
+            )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "walking"
+    assert data["distance_miles"] == 2.0
+    assert data["calories"] == round(3.5 * 70.0 * (30 / 60))
+
+
+def test_add_biking_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "type": "biking",
+                    "distance_miles": 10.0,
+                    "duration_minutes": 40,
+                },
+                headers=api_key_headers
+            )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "biking"
+    assert data["distance_miles"] == 10.0
+    assert data["calories"] == round(7.5 * 70.0 * (40 / 60))
+
+
+def test_add_swimming_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "type": "swimming",
+                    "distance_miles": 1.0,
+                    "duration_minutes": 30,
+                },
+                headers=api_key_headers
+            )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "swimming"
+    assert data["distance_miles"] == 1.0
+    assert data["calories"] == round(6.0 * 70.0 * (30 / 60))
+
+
+def test_add_strength_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "type": "strength",
+                    "duration_minutes": 45,
+                    "sets": 3,
+                    "reps": 10,
+                },
+                headers=api_key_headers
+            )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "strength"
+    assert data["distance_miles"] is None
+    assert data["sets"] == 3
+    assert data["reps"] == 10
+    assert data["calories"] == round(5.0 * 70.0 * (45 / 60))
+
+
+def test_add_running_exercise_without_distance_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.post(
+            "/exercises/",
+            json={"date": "2026-06-22", "type": "running", "duration_minutes": 28},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 422
+
+
+def test_add_walking_exercise_without_distance_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.post(
+            "/exercises/",
+            json={"date": "2026-06-22", "type": "walking", "duration_minutes": 30},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 422
+
+
+def test_add_biking_exercise_without_distance_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.post(
+            "/exercises/",
+            json={"date": "2026-06-22", "type": "biking", "duration_minutes": 40},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 422
+
+
+def test_add_swimming_exercise_without_distance_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.post(
+            "/exercises/",
+            json={"date": "2026-06-22", "type": "swimming", "duration_minutes": 30},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 422
+
+
+def test_add_strength_exercise_without_sets_and_reps_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.post(
+            "/exercises/",
+            json={"date": "2026-06-22", "type": "strength", "duration_minutes": 45},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 422
+
+
+def test_update_exercise_to_strength_type(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 3.1, "duration_minutes": 28},
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+
+            update_response = client.put(
+                f"/exercises/{exercise_id}",
+                json={"type": "strength", "duration_minutes": 45, "sets": 4, "reps": 8},
+                headers=api_key_headers
+            )
+
+    assert update_response.status_code == 200
+    data = update_response.json()
+    assert data["type"] == "strength"
+    assert data["sets"] == 4
+    assert data["reps"] == 8
+    assert data["calories"] == round(5.0 * 70.0 * (45 / 60))
+
+
+def test_update_exercise_to_strength_without_sets_and_reps_returns_422(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 3.1, "duration_minutes": 28},
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+
+            update_response = client.put(
+                f"/exercises/{exercise_id}",
+                json={"type": "strength", "duration_minutes": 45},
+                headers=api_key_headers
+            )
+
+    assert update_response.status_code == 422
+
+
 def test_get_exercise_week_invalid_api_key(client):
     response = client.get(
         "/exercises/",
@@ -96,6 +287,37 @@ def test_update_exercise_recalculates_calories(client, api_key_headers, temp_sch
     assert data["duration_minutes"] == 45
     assert data["notes"] == "long run"
     assert data["calories"] == round(70.0 * 5.0 * 1.668)
+
+
+def test_update_exercise_omitting_type_preserves_stored_non_running_type(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "type": "strength",
+                    "duration_minutes": 45,
+                    "sets": 3,
+                    "reps": 10,
+                },
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+
+            update_response = client.put(
+                f"/exercises/{exercise_id}",
+                json={"duration_minutes": 50, "sets": 4, "reps": 12},
+                headers=api_key_headers
+            )
+
+    assert update_response.status_code == 200
+    data = update_response.json()
+    assert data["type"] == "strength"
+    assert data["sets"] == 4
+    assert data["reps"] == 12
+    assert data["calories"] == round(5.0 * 70.0 * (50 / 60))
 
 
 def test_update_exercise_unknown_id_returns_404(client, api_key_headers, temp_schedule_file):

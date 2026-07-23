@@ -1,5 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal
+
+ExerciseType = Literal["running", "walking", "biking", "swimming", "strength"]
+
+
+def _require_fields_for_exercise_type(
+    exercise_type: str, distance_miles: Optional[float], sets: Optional[int], reps: Optional[int]
+) -> None:
+    """Raise ValueError if the fields required for the given exercise type are missing.
+
+    distance_miles is required for running/walking/biking/swimming; sets and
+    reps are required for strength.
+    """
+    if exercise_type == "strength":
+        if sets is None or reps is None:
+            raise ValueError("sets and reps are required for strength exercises")
+    elif distance_miles is None:
+        raise ValueError("distance_miles is required for running, walking, biking, and swimming exercises")
 
 
 class MealItem(BaseModel):
@@ -143,13 +160,20 @@ class ErrorResponse(BaseModel):
 
 
 class ExerciseItem(BaseModel):
-    """Individual exercise entry (MVP: running only)."""
+    """Individual exercise entry."""
     id: str
-    type: Literal["running"] = "running"
-    distance_miles: float = Field(..., gt=0)
+    type: ExerciseType = "running"
+    distance_miles: Optional[float] = Field(None, gt=0)
     duration_minutes: float = Field(..., gt=0)
+    sets: Optional[int] = Field(None, gt=0)
+    reps: Optional[int] = Field(None, gt=0)
     calories: int = 0
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_required_fields_for_type(self) -> "ExerciseItem":
+        _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
+        return self
 
 
 class ExerciseDayPlan(BaseModel):
@@ -167,19 +191,43 @@ class ExerciseWeekResponse(BaseModel):
 
 
 class AddExerciseRequest(BaseModel):
-    """Request to add a running exercise to a given date."""
+    """Request to add an exercise to a given date."""
     date: str
-    distance_miles: float = Field(..., gt=0)
+    type: ExerciseType = "running"
+    distance_miles: Optional[float] = Field(None, gt=0)
     duration_minutes: float = Field(..., gt=0)
+    sets: Optional[int] = Field(None, gt=0)
+    reps: Optional[int] = Field(None, gt=0)
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_required_fields_for_type(self) -> "AddExerciseRequest":
+        _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
+        return self
 
 
 class UpdateExerciseRequest(BaseModel):
     """Request to update an existing exercise. The exercise stays on its
-    existing day — moving it to a different day is out of scope here."""
-    distance_miles: float = Field(..., gt=0)
+    existing day — moving it to a different day is out of scope here.
+
+    type has no default and is optional, so omitting it preserves the
+    exercise's existing stored type rather than resetting it to "running".
+    The endpoint resolves the effective type (request.type if provided,
+    else the stored value) and validates the merged result against it,
+    since only the endpoint knows the stored type.
+    """
+    type: Optional[ExerciseType] = None
+    distance_miles: Optional[float] = Field(None, gt=0)
     duration_minutes: float = Field(..., gt=0)
+    sets: Optional[int] = Field(None, gt=0)
+    reps: Optional[int] = Field(None, gt=0)
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_required_fields_for_type(self) -> "UpdateExerciseRequest":
+        if self.type is not None:
+            _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
+        return self
 
 
 class GroceriesRequest(BaseModel):
