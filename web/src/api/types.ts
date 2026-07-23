@@ -105,6 +105,7 @@ export interface ExerciseItem {
   reps?: number | null
   calories: number
   notes?: string | null
+  order: number
 }
 
 export interface ExerciseDayPlan {
@@ -136,6 +137,13 @@ export interface UpdateExerciseRequest {
   sets?: number
   reps?: number
   notes?: string
+  date?: string
+  order?: number
+}
+
+export interface ReorderExercisesRequest {
+  date: string
+  ordered_ids: string[]
 }
 
 export type PresetExercise = Omit<AddExerciseRequest, 'date'>

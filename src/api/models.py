@@ -169,6 +169,7 @@ class ExerciseItem(BaseModel):
     reps: Optional[int] = Field(None, gt=0)
     calories: int = 0
     notes: Optional[str] = None
+    order: int = 0
 
     @model_validator(mode="after")
     def _check_required_fields_for_type(self) -> "ExerciseItem":
@@ -207,14 +208,19 @@ class AddExerciseRequest(BaseModel):
 
 
 class UpdateExerciseRequest(BaseModel):
-    """Request to update an existing exercise. The exercise stays on its
-    existing day — moving it to a different day is out of scope here.
+    """Request to update an existing exercise, optionally moving it to a
+    different day.
 
     type has no default and is optional, so omitting it preserves the
     exercise's existing stored type rather than resetting it to "running".
     The endpoint resolves the effective type (request.type if provided,
     else the stored value) and validates the merged result against it,
     since only the endpoint knows the stored type.
+
+    date is optional; when present, the endpoint moves the exercise to
+    that day instead of leaving it on its existing one. order is optional
+    and, when present, persists this exercise's position within its day
+    (see PUT /exercises/reorder for reordering a whole day at once).
     """
     type: Optional[ExerciseType] = None
     distance_miles: Optional[float] = Field(None, gt=0)
@@ -222,12 +228,20 @@ class UpdateExerciseRequest(BaseModel):
     sets: Optional[int] = Field(None, gt=0)
     reps: Optional[int] = Field(None, gt=0)
     notes: Optional[str] = None
+    date: Optional[str] = None
+    order: Optional[int] = None
 
     @model_validator(mode="after")
     def _check_required_fields_for_type(self) -> "UpdateExerciseRequest":
         if self.type is not None:
             _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
         return self
+
+
+class ReorderExercisesRequest(BaseModel):
+    """Request to persist a new within-day ordering for exercises."""
+    date: str
+    ordered_ids: List[str]
 
 
 class PresetExerciseItem(BaseModel):

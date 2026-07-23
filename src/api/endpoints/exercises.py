@@ -9,6 +9,7 @@ from src.api.models import (
     AddExerciseRequest,
     ExerciseItem,
     ExerciseWeekResponse,
+    ReorderExercisesRequest,
     UpdateExerciseRequest,
     _require_fields_for_exercise_type,
 )
@@ -17,9 +18,11 @@ from src.tools.exercise_presets import apply_presets_to_week, load_presets
 from src.tools.exercise_storage import (
     add_exercise,
     delete_exercise,
+    find_exercise_date,
     get_exercise,
     get_week,
     load_schedule,
+    reorder_exercises,
     save_schedule,
     update_exercise,
 )
@@ -108,6 +111,8 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
         schedule_path = Path(SCHEDULE_PATH)
         data = load_schedule(schedule_path)
 
+        existing_exercises = data.get("days", {}).get(request.date, {}).get("exercises", [])
+        next_order = max((e.get("order", 0) for e in existing_exercises), default=-1) + 1
         exercise = {
             "id": uuid.uuid4().hex,
             "type": request.type,
@@ -117,6 +122,7 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
             "reps": request.reps,
             "calories": estimate_calories(request.type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
+            "order": next_order,
         }
         add_exercise(data, request.date, exercise)
 
@@ -130,18 +136,47 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
         raise HTTPException(status_code=500, detail=f"Failed to add exercise: {str(e)}")
 
 
+@router.put("/reorder", status_code=204)
+async def reorder_exercises_endpoint(request: ReorderExercisesRequest):
+    """
+    Persist a new within-day ordering for exercises.
+
+    Registered ahead of PUT /{exercise_id} so "reorder" is never matched
+    as an exercise id.
+
+    Args:
+        request: ReorderExercisesRequest with date and ordered_ids
+
+    Example:
+        PUT /exercises/reorder
+        {"date": "2026-06-22", "ordered_ids": ["ex2", "ex1"]}
+    """
+    try:
+        schedule_path = Path(SCHEDULE_PATH)
+        data = load_schedule(schedule_path)
+
+        if not reorder_exercises(data, request.date, request.ordered_ids):
+            raise HTTPException(status_code=404, detail="Day not found")
+
+        if not save_schedule(schedule_path, data):
+            raise HTTPException(status_code=500, detail="Failed to save exercise order")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reorder exercises: {str(e)}")
+
+
 @router.put("/{exercise_id}", response_model=ExerciseItem)
 async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequest):
     """
-    Update an existing exercise's type, distance/duration or sets/reps, and notes.
-
-    The exercise stays on its existing day; moving it to a different day
-    is out of scope (see issue #36).
+    Update an existing exercise's type, distance/duration or sets/reps,
+    and notes. Optionally moves it to a different day.
 
     Args:
         exercise_id: id of the exercise to update
         request: UpdateExerciseRequest with type, distance/duration or
-                 sets/reps, and notes
+                 sets/reps, notes, and optionally date (to move days) and
+                 order (to persist within-day position)
 
     Returns:
         The updated ExerciseItem, with calories recalculated for its type.
@@ -151,7 +186,8 @@ async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequ
         {
             "type": "running",
             "distance_miles": 5.0,
-            "duration_minutes": 45
+            "duration_minutes": 45,
+            "date": "2026-06-24"
         }
     """
     try:
@@ -181,7 +217,18 @@ async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequ
             "calories": estimate_calories(effective_type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
         }
+        if request.order is not None:
+            updates["order"] = request.order
         exercise = update_exercise(data, exercise_id, updates)
+
+        if request.date is not None:
+            current_date = find_exercise_date(data, exercise_id)
+            if current_date != request.date:
+                delete_exercise(data, exercise_id)
+                if request.order is None:
+                    destination_exercises = data.get("days", {}).get(request.date, {}).get("exercises", [])
+                    exercise["order"] = max((e.get("order", 0) for e in destination_exercises), default=-1) + 1
+                add_exercise(data, request.date, exercise)
 
         if not save_schedule(schedule_path, data):
             raise HTTPException(status_code=500, detail="Failed to save exercise")

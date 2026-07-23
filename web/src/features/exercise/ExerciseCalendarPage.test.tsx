@@ -1,10 +1,34 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ExerciseCalendarPage } from './ExerciseCalendarPage'
-import type { AddExerciseRequest, ExerciseWeekResponse, PresetExercise } from '@/api/types'
+import type {
+  AddExerciseRequest,
+  ExerciseWeekResponse,
+  PresetExercise,
+  ReorderExercisesRequest,
+  UpdateExerciseRequest,
+} from '@/api/types'
+
+// Real pointer-drag simulation is unreliable in jsdom, so DndContext is
+// replaced with a stand-in that just renders its children and stashes the
+// onDragEnd callback it was given — tests below invoke that callback
+// directly with a constructed event, exercising the same wiring
+// (resolveDragEnd -> mutation) that a real drag would.
+let capturedOnDragEnd: ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined
+
+vi.mock('@dnd-kit/core', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core')
+  return {
+    ...actual,
+    DndContext: (props: { onDragEnd?: typeof capturedOnDragEnd; children?: React.ReactNode }) => {
+      capturedOnDragEnd = props.onDragEnd
+      return props.children
+    },
+  }
+})
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -86,8 +110,8 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace' },
-        { id: 'ex2', type: 'running', distance_miles: 5, duration_minutes: 45, calories: 500, notes: null },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace', order: 0 },
+        { id: 'ex2', type: 'running', distance_miles: 5, duration_minutes: 45, calories: 500, notes: null, order: 1 },
       ],
       total_calories: 820,
     }
@@ -106,8 +130,8 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
-        { id: 'ex2', type: 'strength', sets: 3, reps: 10, duration_minutes: 20, calories: 180, notes: null },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null, order: 0 },
+        { id: 'ex2', type: 'strength', sets: 3, reps: 10, duration_minutes: 20, calories: 180, notes: null, order: 1 },
       ],
       total_calories: 500,
     }
@@ -140,6 +164,7 @@ describe('ExerciseCalendarPage', () => {
           duration_minutes: body.duration_minutes,
           calories: 400,
           notes: body.notes ?? null,
+          order: 0,
         }
         week = {
           ...week,
@@ -179,6 +204,7 @@ describe('ExerciseCalendarPage', () => {
           duration_minutes: body.duration_minutes,
           calories: 150,
           notes: null,
+          order: 0,
         }
         week = {
           ...week,
@@ -222,6 +248,7 @@ describe('ExerciseCalendarPage', () => {
           duration_minutes: body.duration_minutes,
           calories: 180,
           notes: null,
+          order: 0,
         }
         week = {
           ...week,
@@ -257,7 +284,7 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace' },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace', order: 0 },
       ],
       total_calories: 320,
     }
@@ -276,6 +303,7 @@ describe('ExerciseCalendarPage', () => {
           duration_minutes: body.duration_minutes,
           calories: 600,
           notes: body.notes ?? null,
+          order: 0,
         }
         week = {
           ...week,
@@ -312,7 +340,7 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null, order: 0 },
       ],
       total_calories: 320,
     }
@@ -337,7 +365,7 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null, order: 0 },
       ],
       total_calories: 320,
     }
@@ -365,7 +393,7 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace' },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace', order: 0 },
       ],
       total_calories: 320,
     }
@@ -398,7 +426,7 @@ describe('ExerciseCalendarPage', () => {
       date: '2026-06-24',
       day_name: 'Wednesday',
       exercises: [
-        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null, order: 0 },
       ],
       total_calories: 320,
     }
@@ -412,5 +440,88 @@ describe('ExerciseCalendarPage', () => {
 
     expect(window.confirm).toHaveBeenCalledWith('Remove this exercise?')
     expect(screen.getByText('3.1 mi · 28 min · 320 cal')).toBeInTheDocument()
+  })
+
+  it('dragging an exercise onto another one in the same day reorders it', async () => {
+    const week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null, order: 0 },
+        { id: 'ex2', type: 'running', distance_miles: 5, duration_minutes: 45, calories: 500, notes: null, order: 1 },
+      ],
+      total_calories: 820,
+    }
+    let reorderedBody: ReorderExercisesRequest | undefined
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.put('http://localhost/api/exercises/reorder', async ({ request }) => {
+        reorderedBody = (await request.json()) as ReorderExercisesRequest
+        return new HttpResponse(null, { status: 204 })
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    await act(async () => {
+      capturedOnDragEnd?.({ active: { id: 'ex1' }, over: { id: 'ex2' } })
+    })
+
+    expect(reorderedBody).toEqual({ date: '2026-06-24', ordered_ids: ['ex2', 'ex1'] })
+  })
+
+  it('dragging an exercise onto a different day drop zone moves it there', async () => {
+    let week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace', order: 0 },
+      ],
+      total_calories: 320,
+    }
+    let movedBody: UpdateExerciseRequest | undefined
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.put('http://localhost/api/exercises/ex1', async ({ request }) => {
+        movedBody = (await request.json()) as UpdateExerciseRequest
+        const moved = {
+          id: 'ex1',
+          type: 'running' as const,
+          distance_miles: 3.1,
+          duration_minutes: 28,
+          calories: 320,
+          notes: 'Easy pace',
+          order: 0,
+        }
+        week = {
+          ...week,
+          days: week.days.map((d) => {
+            if (d.date === '2026-06-24') return { ...d, exercises: [], total_calories: 0 }
+            if (d.date === '2026-06-26') return { ...d, exercises: [moved], total_calories: 320 }
+            return d
+          }),
+        }
+        return HttpResponse.json(moved)
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    await act(async () => {
+      capturedOnDragEnd?.({ active: { id: 'ex1' }, over: { id: 'day:2026-06-26' } })
+    })
+
+    expect(movedBody).toMatchObject({
+      type: 'running',
+      distance_miles: 3.1,
+      duration_minutes: 28,
+      notes: 'Easy pace',
+      date: '2026-06-26',
+    })
+    await screen.findByText('No exercises logged for this day.')
   })
 })
