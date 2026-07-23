@@ -5,8 +5,8 @@ import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
 import { ApiError } from '@/api/client'
 import { getTodayInEST, getCurrentWeekDates } from '@/features/exercise/dateUtils'
-import { useAddExercise, useExerciseWeek } from '@/features/exercise/hooks'
-import type { ExerciseDayPlan } from '@/api/types'
+import { useAddExercise, useDeleteExercise, useExerciseWeek, useUpdateExercise } from '@/features/exercise/hooks'
+import type { ExerciseDayPlan, ExerciseItem } from '@/api/types'
 
 const inputClassName =
   'border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring'
@@ -32,29 +32,47 @@ export function ExerciseCalendarPage() {
   const [distanceMiles, setDistanceMiles] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [notes, setNotes] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useExerciseWeek(weekStart)
   const addExercise = useAddExercise(weekStart)
+  const updateExercise = useUpdateExercise(weekStart)
+  const deleteExercise = useDeleteExercise(weekStart)
 
   const selectedDay = data?.days.find((d) => d.date === selectedDate)
 
+  function resetForm() {
+    setDistanceMiles('')
+    setDurationMinutes('')
+    setNotes('')
+    setEditingId(null)
+  }
+
+  function handleEditClick(exercise: ExerciseItem) {
+    setEditingId(exercise.id)
+    setDistanceMiles(String(exercise.distance_miles))
+    setDurationMinutes(String(exercise.duration_minutes))
+    setNotes(exercise.notes ?? '')
+  }
+
+  function handleRemoveClick(exercise: ExerciseItem) {
+    if (!window.confirm('Remove this exercise?')) return
+    deleteExercise.mutate(exercise.id)
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    addExercise.mutate(
-      {
-        date: selectedDate,
-        distance_miles: parseFloat(distanceMiles),
-        duration_minutes: parseFloat(durationMinutes),
-        notes: notes.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          setDistanceMiles('')
-          setDurationMinutes('')
-          setNotes('')
-        },
-      }
-    )
+    const req = {
+      distance_miles: parseFloat(distanceMiles),
+      duration_minutes: parseFloat(durationMinutes),
+      notes: notes.trim() || undefined,
+    }
+
+    if (editingId) {
+      updateExercise.mutate({ id: editingId, req }, { onSuccess: resetForm })
+    } else {
+      addExercise.mutate({ date: selectedDate, ...req }, { onSuccess: resetForm })
+    }
   }
 
   if (isLoading) return <Spinner />
@@ -92,11 +110,27 @@ export function ExerciseCalendarPage() {
         ) : (
           <ul className="mb-4 space-y-1">
             {selectedDay.exercises.map((exercise) => (
-              <li key={exercise.id} className="text-sm">
+              <li key={exercise.id} className="text-sm flex items-center gap-2">
                 <span>
                   {exercise.distance_miles} mi · {exercise.duration_minutes} min · {exercise.calories} cal
                 </span>
                 {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => handleEditClick(exercise)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="xs"
+                  onClick={() => handleRemoveClick(exercise)}
+                >
+                  Remove
+                </Button>
               </li>
             ))}
           </ul>
@@ -145,12 +179,25 @@ export function ExerciseCalendarPage() {
               className={inputClassName}
             />
           </div>
-          <Button type="submit" disabled={addExercise.isPending}>
-            {addExercise.isPending ? 'Adding…' : 'Add Exercise'}
+          <Button type="submit" disabled={addExercise.isPending || updateExercise.isPending}>
+            {editingId
+              ? updateExercise.isPending
+                ? 'Saving…'
+                : 'Save Changes'
+              : addExercise.isPending
+                ? 'Adding…'
+                : 'Add Exercise'}
           </Button>
+          {editingId && (
+            <Button type="button" variant="outline" onClick={resetForm}>
+              Cancel
+            </Button>
+          )}
         </form>
 
         {addExercise.isError && <ErrorBanner message="Failed to add exercise" />}
+        {updateExercise.isError && <ErrorBanner message="Failed to update exercise" />}
+        {deleteExercise.isError && <ErrorBanner message="Failed to remove exercise" />}
       </Card>
     </div>
   )

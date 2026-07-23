@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 
 def load_schedule(path: Path) -> dict:
@@ -97,3 +98,64 @@ def add_exercise(data: dict, date: str, exercise: dict) -> dict:
 
     days[date]["exercises"].append(exercise)
     return exercise
+
+
+def find_exercise_date(data: dict, exercise_id: str) -> Optional[str]:
+    """
+    Find the date of the day entry that contains the given exercise.
+
+    Args:
+        data: Schedule data as returned by load_schedule
+        exercise_id: id of the exercise to look for
+
+    Returns:
+        The ISO date string containing that exercise, or None if not found.
+    """
+    for date, day in data.get("days", {}).items():
+        if any(exercise["id"] == exercise_id for exercise in day["exercises"]):
+            return date
+    return None
+
+
+def update_exercise(data: dict, exercise_id: str, updates: dict) -> Optional[dict]:
+    """
+    Apply updates to an existing exercise, in place.
+
+    Args:
+        data: Schedule data as returned by load_schedule (mutated in place)
+        exercise_id: id of the exercise to update
+        updates: Fields to merge into the exercise dict
+
+    Returns:
+        The updated exercise dict, or None if no exercise with that id exists.
+    """
+    date = find_exercise_date(data, exercise_id)
+    if date is None:
+        return None
+
+    exercises = data["days"][date]["exercises"]
+    for exercise in exercises:
+        if exercise["id"] == exercise_id:
+            exercise.update(updates)
+            return exercise
+    return None
+
+
+def delete_exercise(data: dict, exercise_id: str) -> bool:
+    """
+    Remove an exercise by id.
+
+    Args:
+        data: Schedule data as returned by load_schedule (mutated in place)
+        exercise_id: id of the exercise to remove
+
+    Returns:
+        True if the exercise was found and removed, False otherwise.
+    """
+    date = find_exercise_date(data, exercise_id)
+    if date is None:
+        return False
+
+    exercises = data["days"][date]["exercises"]
+    data["days"][date]["exercises"] = [e for e in exercises if e["id"] != exercise_id]
+    return True

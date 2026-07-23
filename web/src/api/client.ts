@@ -10,6 +10,7 @@ import type {
   MealPlanResponse,
   MealResponse,
   SearchParams,
+  UpdateExerciseRequest,
 } from '@/api/types'
 
 const BASE = '/api'
@@ -38,6 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         : `Request failed: ${res.status}`
     throw new ApiError(res.status, message)
   }
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
@@ -90,5 +92,9 @@ export const api = {
       request<ExerciseWeekResponse>(`/exercises/?week_start=${weekStart}`),
     add: (body: AddExerciseRequest) =>
       request<ExerciseItem>('/exercises/', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateExerciseRequest) =>
+      request<ExerciseItem>(`/exercises/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    remove: (id: string) =>
+      request<void>(`/exercises/${id}`, { method: 'DELETE' }),
   },
 }

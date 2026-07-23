@@ -4,7 +4,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from tools.exercise_storage import add_exercise, get_week, load_schedule, save_schedule
+from tools.exercise_storage import (
+    add_exercise,
+    delete_exercise,
+    find_exercise_date,
+    get_week,
+    load_schedule,
+    save_schedule,
+    update_exercise,
+)
 
 
 def test_load_schedule_missing_file_returns_empty_days(tmp_path):
@@ -73,3 +81,54 @@ def test_add_exercise_appends_to_existing_date():
     add_exercise(data, "2026-06-22", second)
 
     assert data["days"]["2026-06-22"]["exercises"] == [first, second]
+
+
+def test_find_exercise_date_returns_date_containing_exercise():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "abc123", "type": "running"})
+
+    assert find_exercise_date(data, "abc123") == "2026-06-22"
+
+
+def test_find_exercise_date_returns_none_when_not_found():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "abc123", "type": "running"})
+
+    assert find_exercise_date(data, "unknown-id") is None
+
+
+def test_update_exercise_applies_updates_and_returns_exercise():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {
+        "id": "abc123", "type": "running", "distance_miles": 3.1, "duration_minutes": 28, "calories": 300, "notes": None,
+    })
+
+    updated = update_exercise(data, "abc123", {"distance_miles": 5.0, "duration_minutes": 45, "calories": 500})
+
+    assert updated == {
+        "id": "abc123", "type": "running", "distance_miles": 5.0, "duration_minutes": 45, "calories": 500, "notes": None,
+    }
+    assert data["days"]["2026-06-22"]["exercises"][0] == updated
+
+
+def test_update_exercise_returns_none_when_not_found():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "abc123", "type": "running"})
+
+    assert update_exercise(data, "unknown-id", {"distance_miles": 5.0}) is None
+
+
+def test_delete_exercise_removes_and_returns_true():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "abc123", "type": "running"})
+
+    assert delete_exercise(data, "abc123") is True
+    assert data["days"]["2026-06-22"]["exercises"] == []
+
+
+def test_delete_exercise_returns_false_when_not_found():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "abc123", "type": "running"})
+
+    assert delete_exercise(data, "unknown-id") is False
+    assert data["days"]["2026-06-22"]["exercises"] == [{"id": "abc123", "type": "running"}]

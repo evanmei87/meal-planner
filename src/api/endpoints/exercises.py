@@ -5,9 +5,17 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.models import AddExerciseRequest, ExerciseItem, ExerciseWeekResponse
+from src.api.models import AddExerciseRequest, ExerciseItem, ExerciseWeekResponse, UpdateExerciseRequest
 from src.tools.calculate_exercise_calories import estimate_running_calories
-from src.tools.exercise_storage import add_exercise, get_week, load_schedule, save_schedule
+from src.tools.exercise_storage import (
+    add_exercise,
+    delete_exercise,
+    find_exercise_date,
+    get_week,
+    load_schedule,
+    save_schedule,
+    update_exercise,
+)
 
 router = APIRouter(prefix="/exercises", tags=["Exercises"])
 
@@ -92,3 +100,76 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add exercise: {str(e)}")
+
+
+@router.put("/{exercise_id}", response_model=ExerciseItem)
+async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequest):
+    """
+    Update an existing exercise's distance, duration, and notes.
+
+    The exercise stays on its existing day; moving it to a different day
+    is out of scope (see issue #36).
+
+    Args:
+        exercise_id: id of the exercise to update
+        request: UpdateExerciseRequest with distance, duration, and notes
+
+    Returns:
+        The updated ExerciseItem, with calories recalculated from distance.
+
+    Example:
+        PUT /exercises/abc123
+        {
+            "distance_miles": 5.0,
+            "duration_minutes": 45
+        }
+    """
+    try:
+        schedule_path = Path(SCHEDULE_PATH)
+        data = load_schedule(schedule_path)
+
+        if find_exercise_date(data, exercise_id) is None:
+            raise HTTPException(status_code=404, detail="Exercise not found")
+
+        updates = {
+            "distance_miles": request.distance_miles,
+            "duration_minutes": request.duration_minutes,
+            "calories": estimate_running_calories(request.distance_miles),
+            "notes": request.notes,
+        }
+        exercise = update_exercise(data, exercise_id, updates)
+
+        if not save_schedule(schedule_path, data):
+            raise HTTPException(status_code=500, detail="Failed to save exercise")
+
+        return ExerciseItem(**exercise)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update exercise: {str(e)}")
+
+
+@router.delete("/{exercise_id}", status_code=204)
+async def delete_exercise_endpoint(exercise_id: str):
+    """
+    Delete an exercise.
+
+    Args:
+        exercise_id: id of the exercise to delete
+
+    Example:
+        DELETE /exercises/abc123
+    """
+    try:
+        schedule_path = Path(SCHEDULE_PATH)
+        data = load_schedule(schedule_path)
+
+        if not delete_exercise(data, exercise_id):
+            raise HTTPException(status_code=404, detail="Exercise not found")
+
+        if not save_schedule(schedule_path, data):
+            raise HTTPException(status_code=500, detail="Failed to save exercise")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete exercise: {str(e)}")

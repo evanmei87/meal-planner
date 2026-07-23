@@ -141,4 +141,134 @@ describe('ExerciseCalendarPage', () => {
     await screen.findByText('3.1 mi · 28 min · 400 cal')
     expect(screen.queryByText('No exercises logged for this day.')).not.toBeInTheDocument()
   })
+
+  it('editing an exercise pre-fills the form and the row reflects the new values after save', async () => {
+    let week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace' },
+      ],
+      total_calories: 320,
+    }
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.put('http://localhost/api/exercises/ex1', async ({ request }) => {
+        const body = (await request.json()) as {
+          distance_miles: number
+          duration_minutes: number
+          notes?: string
+        }
+        const updated = {
+          id: 'ex1',
+          type: 'running' as const,
+          distance_miles: body.distance_miles,
+          duration_minutes: body.duration_minutes,
+          calories: 600,
+          notes: body.notes ?? null,
+        }
+        week = {
+          ...week,
+          days: week.days.map((d) =>
+            d.date === '2026-06-24' ? { ...d, exercises: [updated], total_calories: 600 } : d
+          ),
+        }
+        return HttpResponse.json(updated)
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    expect(screen.getByLabelText('Distance (mi)')).toHaveValue(3.1)
+    expect(screen.getByLabelText('Duration (min)')).toHaveValue(28)
+    expect(screen.getByLabelText('Notes (optional)')).toHaveValue('Easy pace')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Distance (mi)'), { target: { value: '6' } })
+    fireEvent.change(screen.getByLabelText('Duration (min)'), { target: { value: '55' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await screen.findByText('6 mi · 55 min · 600 cal')
+    expect(screen.queryByText('3.1 mi · 28 min · 320 cal')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('cancelling an edit returns the form to add mode without changing the row', async () => {
+    const week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+      ],
+      total_calories: 320,
+    }
+    server.use(http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)))
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Distance (mi)')).toHaveValue(null)
+    expect(screen.getByText('3.1 mi · 28 min · 320 cal')).toBeInTheDocument()
+  })
+
+  it('removing an exercise after confirming removes the row', async () => {
+    let week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+      ],
+      total_calories: 320,
+    }
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.delete('http://localhost/api/exercises/ex1', () => {
+        week = { ...week, days: week.days.map((d) => (d.date === '2026-06-24' ? { ...d, exercises: [], total_calories: 0 } : d)) }
+        return new HttpResponse(null, { status: 204 })
+      })
+    )
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('Remove this exercise?')
+    await screen.findByText('No exercises logged for this day.')
+  })
+
+  it('does not remove the exercise when the confirmation is declined', async () => {
+    const week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+      ],
+      total_calories: 320,
+    }
+    server.use(http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)))
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('Remove this exercise?')
+    expect(screen.getByText('3.1 mi · 28 min · 320 cal')).toBeInTheDocument()
+  })
 })

@@ -122,6 +122,12 @@ export interface AddExerciseRequest {
   notes?: string
 }
 
+export interface UpdateExerciseRequest {
+  distance_miles: number
+  duration_minutes: number
+  notes?: string
+}
+
 export interface AppState {
   current_day: string
   plan_id: string
