@@ -208,8 +208,15 @@ class AddExerciseRequest(BaseModel):
 
 class UpdateExerciseRequest(BaseModel):
     """Request to update an existing exercise. The exercise stays on its
-    existing day — moving it to a different day is out of scope here."""
-    type: ExerciseType = "running"
+    existing day — moving it to a different day is out of scope here.
+
+    type has no default and is optional, so omitting it preserves the
+    exercise's existing stored type rather than resetting it to "running".
+    The endpoint resolves the effective type (request.type if provided,
+    else the stored value) and validates the merged result against it,
+    since only the endpoint knows the stored type.
+    """
+    type: Optional[ExerciseType] = None
     distance_miles: Optional[float] = Field(None, gt=0)
     duration_minutes: float = Field(..., gt=0)
     sets: Optional[int] = Field(None, gt=0)
@@ -218,7 +225,8 @@ class UpdateExerciseRequest(BaseModel):
 
     @model_validator(mode="after")
     def _check_required_fields_for_type(self) -> "UpdateExerciseRequest":
-        _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
+        if self.type is not None:
+            _require_fields_for_exercise_type(self.type, self.distance_miles, self.sets, self.reps)
         return self
 
 

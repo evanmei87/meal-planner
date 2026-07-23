@@ -5,12 +5,18 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.models import AddExerciseRequest, ExerciseItem, ExerciseWeekResponse, UpdateExerciseRequest
+from src.api.models import (
+    AddExerciseRequest,
+    ExerciseItem,
+    ExerciseWeekResponse,
+    UpdateExerciseRequest,
+    _require_fields_for_exercise_type,
+)
 from src.tools.calculate_exercise_calories import estimate_calories
 from src.tools.exercise_storage import (
     add_exercise,
     delete_exercise,
-    find_exercise_date,
+    get_exercise,
     get_week,
     load_schedule,
     save_schedule,
@@ -134,16 +140,27 @@ async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequ
         schedule_path = Path(SCHEDULE_PATH)
         data = load_schedule(schedule_path)
 
-        if find_exercise_date(data, exercise_id) is None:
+        existing = get_exercise(data, exercise_id)
+        if existing is None:
             raise HTTPException(status_code=404, detail="Exercise not found")
 
+        # type is optional on the request so that omitting it preserves the
+        # exercise's stored type instead of resetting it to "running". The
+        # model can't validate this merged case itself, since it doesn't
+        # know the stored type — do it here against the effective type.
+        effective_type = request.type if request.type is not None else existing["type"]
+        try:
+            _require_fields_for_exercise_type(effective_type, request.distance_miles, request.sets, request.reps)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
         updates = {
-            "type": request.type,
+            "type": effective_type,
             "distance_miles": request.distance_miles,
             "duration_minutes": request.duration_minutes,
             "sets": request.sets,
             "reps": request.reps,
-            "calories": estimate_calories(request.type, request.distance_miles, request.duration_minutes),
+            "calories": estimate_calories(effective_type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
         }
         exercise = update_exercise(data, exercise_id, updates)
