@@ -52,9 +52,9 @@ def load_saved_meals(filter_category: str = None,
     
     if search_term:
         search_lower = search_term.lower()
-        meals = [m for m in meals if 
-                  search_lower in m['name'].lower() or 
-                  any(search_lower in ing.lower() for ing in m['ingredients']) or
+        meals = [m for m in meals if
+                  search_lower in m['name'].lower() or
+                  any(search_lower in ing['name'].lower() for ing in m['ingredients']) or
                   any(search_lower in tag.lower() for tag in m['tags'])]
     
     return meals
@@ -87,9 +87,9 @@ def search_meals(criteria: dict) -> list:
     # Apply search term filter
     if 'search_term' in criteria:
         search_lower = criteria['search_term'].lower()
-        meals = [m for m in meals if 
-                  search_lower in m['name'].lower() or 
-                  any(search_lower in ing.lower() for ing in m['ingredients']) or
+        meals = [m for m in meals if
+                  search_lower in m['name'].lower() or
+                  any(search_lower in ing['name'].lower() for ing in m['ingredients']) or
                   any(search_lower in tag.lower() for tag in m['tags'])]
     
     # Apply macro range filters
@@ -120,7 +120,7 @@ def search_meals(criteria: dict) -> list:
     # Apply ingredient filter
     if 'ingredient' in criteria:
         ingredient_lower = criteria['ingredient'].lower()
-        meals = [m for m in meals if any(ingredient_lower in ing.lower() for ing in m['ingredients'])]
+        meals = [m for m in meals if any(ingredient_lower in ing['name'].lower() for ing in m['ingredients'])]
     
     # Apply tag filter
     if 'tag' in criteria:
@@ -180,7 +180,7 @@ def main():
             print(f"### {meal['name']}")
             print(f"Category: {meal['category']}")
             print(f"Macros: {meal['macros']['calories']} cal, {meal['macros']['protein']}g protein, {meal['macros']['carbs']}g carbs, {meal['macros']['fat']}g fat")
-            print(f"I n g r e d i e n t s: {', '.join(meal['ingredients'])}")
+            print(f"I n g r e d i e n t s: {', '.join(ing['name'] for ing in meal['ingredients'])}")
             print(f"Instructions: {meal['instructions']}")
             if meal['tags']:
                 print(f"Tags: {', '.join(meal['tags'])}")

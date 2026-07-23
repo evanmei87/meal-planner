@@ -46,7 +46,7 @@ def test_load_saved_meals_parses_fields(monkeypatch):
     assert chicken['category'] == 'Dinner'
     assert chicken['macros']['calories'] == 600
     assert chicken['macros']['protein'] == 45
-    assert 'Chicken Breast' in chicken['ingredients']
+    assert 'Chicken Breast' in [ing['name'] for ing in chicken['ingredients']]
     assert 'high_protein' in chicken['tags']
     assert chicken['servings'] == 1
 

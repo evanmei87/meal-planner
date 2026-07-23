@@ -278,7 +278,10 @@ def _build_candidate_meals(state: dict, inventory: list[dict]) -> list[dict]:
                 "name": meal["name"],
                 "calories": meal["macros"].get("calories", 0),
                 "macros": meal["macros"],
-                "ingredients": meal.get("ingredients", []),
+                # Scoring/grocery-mapping below keys off plain ingredient-name
+                # strings, so structured {name, serving, ...} ingredient
+                # objects are reduced to their name here.
+                "ingredients": [ing["name"] for ing in meal.get("ingredients", [])],
                 "category": meal.get("category", ""),
             })
 

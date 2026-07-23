@@ -6,7 +6,10 @@ def test_add_meal_success(client, api_key_headers):
     """Test successful meal addition."""
     meal_data = {
         "name": "Test Meal",
-        "ingredients": ["Ingredient 1", "Ingredient 2"],
+        "ingredients": [
+            {"name": "Ingredient 1", "serving": "1 cup", "calories": 300, "protein": 20, "carbs": 10, "fat": 8},
+            {"name": "Ingredient 2", "serving": "1 tbsp", "calories": 200, "protein": 10, "carbs": 10, "fat": 7},
+        ],
         "macros": {"calories": 500, "protein": 30, "carbs": 20, "fat": 15},
         "instructions": ["Step 1", "Step 2"],
         "category": "Dinner",

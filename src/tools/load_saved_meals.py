@@ -59,11 +59,11 @@ def load_saved_meals(filter_category: str = None,
     
     if search_term:
         search_lower = search_term.lower()
-        meals = [m for m in meals if 
-                  search_lower in m['name'].lower() or 
-                  any(search_lower in ing.lower() for ing in m['ingredients']) or
+        meals = [m for m in meals if
+                  search_lower in m['name'].lower() or
+                  any(search_lower in ing['name'].lower() for ing in m['ingredients']) or
                   any(search_lower in tag.lower() for tag in m['tags'])]
-    
+
     return meals
 
 
@@ -96,7 +96,7 @@ def format_meals_cli(meals: list) -> str:
         lines.append(f"Category: {meal['category']}")
         lines.append(f"Version: {meal['version']}")
         lines.append(f"Macros: {meal['macros'].get('calories', 0)} cal, {meal['macros'].get('protein', 0)}g protein, {meal['macros'].get('carbs', 0)}g carbs, {meal['macros'].get('fat', 0)}g fat")
-        lines.append(f"Ingredients: {', '.join(meal['ingredients'])}")
+        lines.append(f"Ingredients: {', '.join(ing['name'] for ing in meal['ingredients'])}")
         lines.append(f"Instructions: {meal['instructions']}")
         if meal['tags']:
             lines.append(f"Tags: {', '.join(meal['tags'])}")

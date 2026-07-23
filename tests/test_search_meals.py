@@ -7,12 +7,17 @@ from tools.search_meals import search_meals
 
 # --- Fixture helpers ---
 
+def _ingredient(name: str) -> dict:
+    """Minimal structured ingredient for tests that only care about the name."""
+    return {'name': name, 'serving': '', 'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
+
+
 SAMPLE_MEALS = [
     {
         'name': 'Chicken Bowl',
         'category': 'Dinner',
         'macros': {'calories': 600, 'protein': 45, 'carbs': 55, 'fat': 12},
-        'ingredients': ['Chicken Breast', 'White Rice', 'Broccoli'],
+        'ingredients': [_ingredient('Chicken Breast'), _ingredient('White Rice'), _ingredient('Broccoli')],
         'instructions': ['Cook chicken', 'Cook rice'],
         'tags': ['high_protein', 'quick'],
     },
@@ -20,7 +25,7 @@ SAMPLE_MEALS = [
         'name': 'Oatmeal',
         'category': 'Breakfast',
         'macros': {'calories': 400, 'protein': 15, 'carbs': 70, 'fat': 8},
-        'ingredients': ['Oatmeal', 'Berries'],
+        'ingredients': [_ingredient('Oatmeal'), _ingredient('Berries')],
         'instructions': ['Cook oatmeal'],
         'tags': ['vegetarian'],
     },
@@ -28,7 +33,7 @@ SAMPLE_MEALS = [
         'name': 'Salmon Bowl',
         'category': 'Dinner',
         'macros': {'calories': 700, 'protein': 50, 'carbs': 45, 'fat': 25},
-        'ingredients': ['Salmon', 'Quinoa', 'Spinach'],
+        'ingredients': [_ingredient('Salmon'), _ingredient('Quinoa'), _ingredient('Spinach')],
         'instructions': ['Cook salmon', 'Cook quinoa'],
         'tags': ['high_protein'],
     },
