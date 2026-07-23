@@ -138,6 +138,8 @@ export interface UpdateExerciseRequest {
   notes?: string
 }
 
+export type PresetExercise = Omit<AddExerciseRequest, 'date'>
+
 export interface AppState {
   current_day: string
   plan_id: string

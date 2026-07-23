@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ExerciseCalendarPage } from './ExerciseCalendarPage'
-import type { AddExerciseRequest, ExerciseWeekResponse } from '@/api/types'
+import type { AddExerciseRequest, ExerciseWeekResponse, PresetExercise } from '@/api/types'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -357,6 +357,39 @@ describe('ExerciseCalendarPage', () => {
 
     expect(window.confirm).toHaveBeenCalledWith('Remove this exercise?')
     await screen.findByText('No exercises logged for this day.')
+  })
+
+  it('saving a preset posts the day exercises stripped of id/calories and shows a confirmation', async () => {
+    const week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: 'Easy pace' },
+      ],
+      total_calories: 320,
+    }
+    let postedBody: PresetExercise[] | undefined
+    let postedDayName: string | undefined
+    server.use(
+      http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)),
+      http.post('http://localhost/api/exercise-presets/:dayName', async ({ request, params }) => {
+        postedDayName = params.dayName as string
+        postedBody = (await request.json()) as PresetExercise[]
+        return HttpResponse.json(postedBody)
+      })
+    )
+
+    renderExercisePage()
+    await screen.findByText('3.1 mi · 28 min · 320 cal')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save to preset' }))
+
+    await screen.findByText('Saved!')
+    expect(postedDayName).toBe('Wednesday')
+    expect(postedBody).toEqual([
+      { type: 'running', distance_miles: 3.1, duration_minutes: 28, notes: 'Easy pace' },
+    ])
   })
 
   it('does not remove the exercise when the confirmation is declined', async () => {

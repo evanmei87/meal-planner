@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
-import type { AddExerciseRequest, UpdateExerciseRequest } from '@/api/types'
+import type { AddExerciseRequest, PresetExercise, UpdateExerciseRequest } from '@/api/types'
 
 export function useExerciseWeek(weekStart: string) {
   return useQuery({ queryKey: ['exercises', weekStart], queryFn: () => api.exercises.getWeek(weekStart) })
@@ -27,5 +27,12 @@ export function useDeleteExercise(weekStart: string) {
   return useMutation({
     mutationFn: (id: string) => api.exercises.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exercises', weekStart] }),
+  })
+}
+
+export function useSavePreset() {
+  return useMutation({
+    mutationFn: ({ dayName, exercises }: { dayName: string; exercises: PresetExercise[] }) =>
+      api.exercisePresets.save(dayName, exercises),
   })
 }

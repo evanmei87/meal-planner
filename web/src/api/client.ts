@@ -9,6 +9,7 @@ import type {
   MealPlanRequest,
   MealPlanResponse,
   MealResponse,
+  PresetExercise,
   SearchParams,
   UpdateExerciseRequest,
 } from '@/api/types'
@@ -96,5 +97,12 @@ export const api = {
       request<ExerciseItem>(`/exercises/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/exercises/${id}`, { method: 'DELETE' }),
+  },
+  exercisePresets: {
+    save: (dayName: string, exercises: PresetExercise[]) =>
+      request<PresetExercise[]>(`/exercise-presets/${dayName}`, {
+        method: 'POST',
+        body: JSON.stringify(exercises),
+      }),
   },
 }
