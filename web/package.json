@@ -17,6 +17,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource-variable/geist": "^5.2.9",
     "@tanstack/react-query": "^5.62.7",
+    "@tremor/react": "^3.18.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.22.0",

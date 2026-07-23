@@ -7,6 +7,7 @@ import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
 import { useAppState } from '@/features/state/hooks'
 import { usePlan, useGeneratePlan } from '@/features/plan/hooks'
+import { CalorieTrendChart } from '@/features/plan/CalorieTrendChart'
 
 export function PlanPage() {
   const { data: planData, isLoading, isError, error } = usePlan()
@@ -75,6 +76,8 @@ export function PlanPage() {
         <p className="text-gray-500 text-sm">No plan yet — click Generate Plan.</p>
       ) : (
         <>
+          <CalorieTrendChart days={days} />
+
           <div className="flex gap-2 mb-4 flex-wrap">
             {days.map((d) => (
               <button
