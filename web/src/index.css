@@ -3,6 +3,16 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+/*
+ * Tremor (#42) builds its Tailwind classes at runtime from string concatenation
+ * (e.g. `fill-${color}`), so the literal class name never appears as text
+ * anywhere Tailwind's scanner can see it — not even inside Tremor's own
+ * dist files. `@source inline(...)` force-generates the exact utilities our
+ * charts pass through the `colors` prop, the v4 CSS-first replacement for a
+ * v3 `safelist`. Extend this list if a chart adds another design token color.
+ */
+@source inline("{fill,stroke}-[var(--color-chart-{1,2,3,4,5})]");
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
