@@ -11,12 +11,21 @@ picks the option back up.
 
 ## Scope
 
-Add `framer-motion` as the animation dependency (matches the issue's own
-naming; the `motion` package is the same code under a newer name, but
-`framer-motion` is what the issue and the research doc call out). Add two
-small, on-demand components under `web/src/components/magicui/` — no bulk
-import of a MagicUI kit, no core component or data-viz changes (both
-explicitly out of scope per the issue).
+Both effects the issue asks for — a looping pulse ring and a one-shot
+fade+slide reveal — are CSS keyframe loops/transitions with no need for a JS
+animation runtime. The project already ships everything required:
+`tw-animate-css` (already a dependency, already imported in
+`web/src/index.css`) provides `animate-in`/`fade-in`/`slide-in-from-*`
+utilities, and Tailwind core ships `animate-ping`/`animate-pulse` plus a
+built-in `motion-reduce:` variant for `prefers-reduced-motion` — all pure
+CSS, no `useReducedMotion()` hook or extra dependency needed. An earlier
+version of this plan added `framer-motion` for these two effects; that was
+reworked after review flagged it against the issue's own acceptance
+criterion of no measurable bundle-size regression (framer-motion added
++41.13kB gzip for effects CSS already covers). Add two small, on-demand
+components under `web/src/components/magicui/` — no bulk import of a
+MagicUI kit, no core component or data-viz changes (both explicitly out of
+scope per the issue).
 
 Target surfaces (2, reusing 2 components across 3 wire-ups — the issue's own
 suggested examples):
@@ -35,9 +44,8 @@ Components:
 - `PulsatingButton` — wraps a button with an animated pulsing ring while an
   action is pending.
 
-Both call framer-motion's `useReducedMotion()` and skip the animation
-entirely (rendering already-settled / without the pulse) when the user has
-`prefers-reduced-motion` set.
+Both use Tailwind's `motion-reduce:` variant to freeze the animation via CSS
+when the user has `prefers-reduced-motion` set — no JS media-query check.
 
 ## Verification
 
@@ -46,7 +54,7 @@ entirely (rendering already-settled / without the pulse) when the user has
   requested).
 - `npx tsc --noEmit` — no errors.
 - `npm run build` — bundle size compared gzip'd JS before/after to confirm
-  the size delta is attributable to framer-motion, not scope creep.
+  no measurable regression, since both effects are pure CSS.
 - `node .design-sync/check/ds-check.mjs --gate` from repo root — no new
   Tier 1 violations (the new components live outside the checked
   `web/src/features/` scope; the two edited feature files only add

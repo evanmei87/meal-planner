@@ -1,5 +1,5 @@
-import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 interface BlurFadeProps {
   /** Changing this key remounts the wrapper, re-triggering the reveal (e.g. a selected day/tab id). */
@@ -10,21 +10,17 @@ interface BlurFadeProps {
 
 /**
  * Subtle fade + slide-up reveal for content that swaps on tab/day selection
- * (MagicUI's "blur fade" pattern). Skips the animation and renders already
- * settled when the user prefers reduced motion.
+ * (MagicUI's "blur fade" pattern). Remounting on `transitionKey` change
+ * replays `tw-animate-css`'s enter animation; `motion-reduce:animate-none`
+ * renders already-settled when the user prefers reduced motion.
  */
 export function BlurFade({ transitionKey, children, className }: BlurFadeProps) {
-  const shouldReduceMotion = useReducedMotion()
-
   return (
-    <motion.div
+    <div
       key={transitionKey}
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
-      className={className}
+      className={cn('animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none', className)}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
