@@ -8,6 +8,8 @@ import { Spinner } from '@/components/Spinner'
 import { useAppState } from '@/features/state/hooks'
 import { usePlan, useGeneratePlan } from '@/features/plan/hooks'
 import { CalorieTrendChart } from '@/features/plan/CalorieTrendChart'
+import { BlurFade } from '@/components/magicui/BlurFade'
+import { PulsatingButton } from '@/components/magicui/PulsatingButton'
 
 export function PlanPage() {
   const { data: planData, isLoading, isError, error } = usePlan()
@@ -61,13 +63,15 @@ export function PlanPage() {
           onChange={(e) => setPreferences(e.target.value)}
           className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
         />
-        <button
-          onClick={handleGenerate}
-          disabled={generate.isPending}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
-        >
-          {generate.isPending ? 'Generating…' : 'Generate Plan'}
-        </button>
+        <PulsatingButton pulsating={generate.isPending}>
+          <button
+            onClick={handleGenerate}
+            disabled={generate.isPending}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+          >
+            {generate.isPending ? 'Generating…' : 'Generate Plan'}
+          </button>
+        </PulsatingButton>
       </div>
 
       {generate.isError && <ErrorBanner message="Failed to generate plan" />}
@@ -95,7 +99,7 @@ export function PlanPage() {
           </div>
 
           {currentDayPlan && (
-            <div>
+            <BlurFade transitionKey={currentDayPlan.day}>
               <p className="text-sm text-gray-500 mb-3">
                 {currentDayPlan.total_calories} cal total · {currentDayPlan.total_protein}g protein ·{' '}
                 {currentDayPlan.total_carbs}g carbs
@@ -130,7 +134,7 @@ export function PlanPage() {
                   </Link>
                 </p>
               )}
-            </div>
+            </BlurFade>
           )}
         </>
       )}
