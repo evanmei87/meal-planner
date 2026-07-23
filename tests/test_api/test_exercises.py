@@ -442,6 +442,64 @@ def test_reorder_exercises_updates_order_values(client, api_key_headers, temp_sc
     assert orders_by_id[first["id"]] == 1
 
 
+def test_new_exercise_order_does_not_collide_after_earlier_delete(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            ids = []
+            for _ in range(3):
+                created = client.post(
+                    "/exercises/",
+                    json={"date": "2026-06-22", "distance_miles": 1.0, "duration_minutes": 10},
+                    headers=api_key_headers
+                ).json()
+                ids.append(created["id"])
+
+            client.delete(f"/exercises/{ids[1]}", headers=api_key_headers)
+
+            newest = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 1.0, "duration_minutes": 10},
+                headers=api_key_headers
+            ).json()
+
+            week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    exercises = week_response.json()["days"][0]["exercises"]
+    orders = [e["order"] for e in exercises]
+    assert len(orders) == len(set(orders)), f"duplicate order values: {orders}"
+    assert newest["order"] == 3
+
+
+def test_cross_day_move_rebases_order_in_destination_day(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            destination_existing = client.post(
+                "/exercises/",
+                json={"date": "2026-06-23", "distance_miles": 1.0, "duration_minutes": 10},
+                headers=api_key_headers
+            ).json()
+            moved = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 2.0, "duration_minutes": 20},
+                headers=api_key_headers
+            ).json()
+
+            client.put(
+                f"/exercises/{moved['id']}",
+                json={"distance_miles": 2.0, "duration_minutes": 20, "date": "2026-06-23"},
+                headers=api_key_headers
+            )
+
+            week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    destination_day = week_response.json()["days"][1]
+    orders_by_id = {e["id"]: e["order"] for e in destination_day["exercises"]}
+    assert orders_by_id[destination_existing["id"]] != orders_by_id[moved["id"]]
+    assert orders_by_id[moved["id"]] == orders_by_id[destination_existing["id"]] + 1
+
+
 def test_reorder_exercises_unknown_date_returns_404(client, api_key_headers, temp_schedule_file):
     with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
         response = client.put(

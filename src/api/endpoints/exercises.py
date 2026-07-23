@@ -112,6 +112,7 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
         data = load_schedule(schedule_path)
 
         existing_exercises = data.get("days", {}).get(request.date, {}).get("exercises", [])
+        next_order = max((e.get("order", 0) for e in existing_exercises), default=-1) + 1
         exercise = {
             "id": uuid.uuid4().hex,
             "type": request.type,
@@ -121,7 +122,7 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
             "reps": request.reps,
             "calories": estimate_calories(request.type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
-            "order": len(existing_exercises),
+            "order": next_order,
         }
         add_exercise(data, request.date, exercise)
 
@@ -224,6 +225,9 @@ async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequ
             current_date = find_exercise_date(data, exercise_id)
             if current_date != request.date:
                 delete_exercise(data, exercise_id)
+                if request.order is None:
+                    destination_exercises = data.get("days", {}).get(request.date, {}).get("exercises", [])
+                    exercise["order"] = max((e.get("order", 0) for e in destination_exercises), default=-1) + 1
                 add_exercise(data, request.date, exercise)
 
         if not save_schedule(schedule_path, data):
