@@ -63,6 +63,8 @@ def get_week(data: dict, week_start: str) -> list[dict]:
     Returns:
         List of 7 day dicts shaped like ExerciseDayPlan, in date order.
         Dates not present in storage are returned as empty days.
+        total_calories is recomputed from each day's exercises so it
+        never drifts from the stored per-exercise values.
     """
     days = data.get("days", {})
     start = datetime.fromisoformat(week_start)
@@ -70,7 +72,9 @@ def get_week(data: dict, week_start: str) -> list[dict]:
     week = []
     for offset in range(7):
         date = (start + timedelta(days=offset)).strftime("%Y-%m-%d")
-        week.append(days[date] if date in days else _empty_day(date))
+        day = days[date] if date in days else _empty_day(date)
+        day["total_calories"] = sum(exercise.get("calories", 0) for exercise in day["exercises"])
+        week.append(day)
 
     return week
 

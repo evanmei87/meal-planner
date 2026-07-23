@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.models import AddExerciseRequest, ExerciseItem, ExerciseWeekResponse
+from src.tools.calculate_exercise_calories import estimate_running_calories
 from src.tools.exercise_storage import add_exercise, get_week, load_schedule, save_schedule
 
 router = APIRouter(prefix="/exercises", tags=["Exercises"])
@@ -59,8 +60,7 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
         request: AddExerciseRequest with date, distance, duration, and notes
 
     Returns:
-        The created ExerciseItem. Calorie calculation is wired in by issue 03,
-        so calories is always 0 here.
+        The created ExerciseItem, with calories estimated from distance.
 
     Example:
         POST /exercises/
@@ -79,7 +79,7 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
             "type": "running",
             "distance_miles": request.distance_miles,
             "duration_minutes": request.duration_minutes,
-            "calories": 0,
+            "calories": estimate_running_calories(request.distance_miles),
             "notes": request.notes,
         }
         add_exercise(data, request.date, exercise)
