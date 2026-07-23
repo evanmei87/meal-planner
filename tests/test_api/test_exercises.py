@@ -322,6 +322,147 @@ def test_update_exercise_omitting_type_preserves_stored_non_running_type(client,
     assert data["calories"] == round(5.0 * 70.0 * (50 / 60))
 
 
+def test_update_exercise_with_date_moves_it_to_new_day(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "distance_miles": 3.1,
+                    "duration_minutes": 28,
+                    "notes": "easy morning run",
+                },
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+            original_calories = create_response.json()["calories"]
+
+            move_response = client.put(
+                f"/exercises/{exercise_id}",
+                json={
+                    "distance_miles": 3.1,
+                    "duration_minutes": 28,
+                    "notes": "easy morning run",
+                    "date": "2026-06-24",
+                },
+                headers=api_key_headers
+            )
+
+            week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    assert move_response.status_code == 200
+    moved = move_response.json()
+    assert moved["id"] == exercise_id
+    assert moved["calories"] == original_calories
+
+    week_days = week_response.json()["days"]
+    old_day = next(d for d in week_days if d["date"] == "2026-06-22")
+    new_day = next(d for d in week_days if d["date"] == "2026-06-24")
+    assert old_day["exercises"] == []
+    assert [e["id"] for e in new_day["exercises"]] == [exercise_id]
+
+
+def test_update_exercise_with_date_and_changed_fields_recalculates_calories(
+    client, api_key_headers, temp_schedule_file
+):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 3.1, "duration_minutes": 28},
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+
+            move_response = client.put(
+                f"/exercises/{exercise_id}",
+                json={"distance_miles": 5.0, "duration_minutes": 45, "date": "2026-06-24"},
+                headers=api_key_headers
+            )
+
+    assert move_response.status_code == 200
+    data = move_response.json()
+    assert data["distance_miles"] == 5.0
+    assert data["calories"] == round(70.0 * 5.0 * 1.668)
+
+
+def test_update_exercise_with_same_date_does_not_move_it(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            create_response = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 3.1, "duration_minutes": 28},
+                headers=api_key_headers
+            )
+            exercise_id = create_response.json()["id"]
+
+            client.put(
+                f"/exercises/{exercise_id}",
+                json={"distance_miles": 3.1, "duration_minutes": 28, "date": "2026-06-22"},
+                headers=api_key_headers
+            )
+
+            week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    day = week_response.json()["days"][0]
+    assert [e["id"] for e in day["exercises"]] == [exercise_id]
+
+
+def test_reorder_exercises_updates_order_values(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            first = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 1.0, "duration_minutes": 10},
+                headers=api_key_headers
+            ).json()
+            second = client.post(
+                "/exercises/",
+                json={"date": "2026-06-22", "distance_miles": 2.0, "duration_minutes": 20},
+                headers=api_key_headers
+            ).json()
+
+            reorder_response = client.put(
+                "/exercises/reorder",
+                json={"date": "2026-06-22", "ordered_ids": [second["id"], first["id"]]},
+                headers=api_key_headers
+            )
+
+            week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    assert reorder_response.status_code == 204
+    exercises = week_response.json()["days"][0]["exercises"]
+    orders_by_id = {e["id"]: e["order"] for e in exercises}
+    assert orders_by_id[second["id"]] == 0
+    assert orders_by_id[first["id"]] == 1
+
+
+def test_reorder_exercises_unknown_date_returns_404(client, api_key_headers, temp_schedule_file):
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
+        response = client.put(
+            "/exercises/reorder",
+            json={"date": "2026-06-22", "ordered_ids": ["a", "b"]},
+            headers=api_key_headers
+        )
+
+    assert response.status_code == 404
+
+
+def test_reorder_exercises_invalid_api_key(client):
+    response = client.put(
+        "/exercises/reorder",
+        json={"date": "2026-06-22", "ordered_ids": []},
+        headers={"X-API-Key": "invalid-key"}
+    )
+
+    assert response.status_code == 401
+
+
 def test_update_exercise_unknown_id_returns_404(client, api_key_headers, temp_schedule_file):
     with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
         response = client.put(

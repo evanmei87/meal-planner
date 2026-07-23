@@ -159,6 +159,29 @@ def update_exercise(data: dict, exercise_id: str, updates: dict) -> Optional[dic
     return None
 
 
+def reorder_exercises(data: dict, date: str, ordered_ids: list[str]) -> bool:
+    """
+    Set each exercise's order field to match its index in ordered_ids.
+
+    Args:
+        data: Schedule data as returned by load_schedule (mutated in place)
+        date: ISO date of the day whose exercises to reorder
+        ordered_ids: Exercise ids in the desired display order
+
+    Returns:
+        True if the date has a day entry in storage, False otherwise.
+    """
+    day = data.get("days", {}).get(date)
+    if day is None:
+        return False
+
+    index_by_id = {exercise_id: index for index, exercise_id in enumerate(ordered_ids)}
+    for exercise in day["exercises"]:
+        if exercise["id"] in index_by_id:
+            exercise["order"] = index_by_id[exercise["id"]]
+    return True
+
+
 def delete_exercise(data: dict, exercise_id: str) -> bool:
     """
     Remove an exercise by id.

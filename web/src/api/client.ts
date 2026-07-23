@@ -10,6 +10,7 @@ import type {
   MealPlanResponse,
   MealResponse,
   PresetExercise,
+  ReorderExercisesRequest,
   SearchParams,
   UpdateExerciseRequest,
 } from '@/api/types'
@@ -97,6 +98,8 @@ export const api = {
       request<ExerciseItem>(`/exercises/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/exercises/${id}`, { method: 'DELETE' }),
+    reorder: (body: ReorderExercisesRequest) =>
+      request<void>('/exercises/reorder', { method: 'PUT', body: JSON.stringify(body) }),
   },
   exercisePresets: {
     save: (dayName: string, exercises: PresetExercise[]) =>

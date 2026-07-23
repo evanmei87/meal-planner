@@ -10,6 +10,7 @@ from tools.exercise_storage import (
     find_exercise_date,
     get_week,
     load_schedule,
+    reorder_exercises,
     save_schedule,
     update_exercise,
 )
@@ -132,3 +133,21 @@ def test_delete_exercise_returns_false_when_not_found():
 
     assert delete_exercise(data, "unknown-id") is False
     assert data["days"]["2026-06-22"]["exercises"] == [{"id": "abc123", "type": "running"}]
+
+
+def test_reorder_exercises_sets_order_to_match_ordered_ids():
+    data = {"days": {}}
+    add_exercise(data, "2026-06-22", {"id": "one", "type": "running", "order": 0})
+    add_exercise(data, "2026-06-22", {"id": "two", "type": "running", "order": 1})
+    add_exercise(data, "2026-06-22", {"id": "three", "type": "running", "order": 2})
+
+    assert reorder_exercises(data, "2026-06-22", ["three", "one", "two"]) is True
+
+    exercises = data["days"]["2026-06-22"]["exercises"]
+    assert {e["id"]: e["order"] for e in exercises} == {"three": 0, "one": 1, "two": 2}
+
+
+def test_reorder_exercises_returns_false_when_date_not_found():
+    data = {"days": {}}
+
+    assert reorder_exercises(data, "2026-06-22", ["one", "two"]) is False
