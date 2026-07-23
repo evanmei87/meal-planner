@@ -2,10 +2,42 @@ import { useState } from 'react'
 import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
 import { Table } from '@/components/Table'
-import type { AddMealRequest, MealResponse, SearchParams } from '@/api/types'
+import { Button } from '@/components/ui/button'
+import type { AddMealRequest, MealIngredient, MealResponse, SearchParams } from '@/api/types'
 import { ApiError } from '@/api/client'
 import { useSearchMeals, useAddMeal } from '@/features/meals/hooks'
 import { MealDetailDialog } from '@/features/meals/MealDetailDialog'
+
+// Mirrors ExerciseCalendarPage's `inputClassName`: a bare `border` (no
+// palette/border-color literal) so new inputs don't add to the ad-hoc-input
+// count until a shared Input primitive exists (see .design-sync/north-star.md).
+const ingredientInputClassName = 'w-full border rounded px-2 py-1 text-sm'
+
+interface IngredientFormRow {
+  name: string
+  serving: string
+  calories: string
+  protein: string
+  carbs: string
+  fat: string
+}
+
+function emptyIngredientRow(): IngredientFormRow {
+  return { name: '', serving: '', calories: '', protein: '', carbs: '', fat: '' }
+}
+
+function toMealIngredients(rows: IngredientFormRow[]): MealIngredient[] {
+  return rows
+    .filter((row) => row.name.trim())
+    .map((row) => ({
+      name: row.name.trim(),
+      serving: row.serving.trim(),
+      calories: parseInt(row.calories) || 0,
+      protein: parseInt(row.protein) || 0,
+      carbs: parseInt(row.carbs) || 0,
+      fat: parseInt(row.fat) || 0,
+    }))
+}
 
 export function MealsPage() {
   const [filters, setFilters] = useState<SearchParams>({})
@@ -16,19 +48,30 @@ export function MealsPage() {
   const addMeal = useAddMeal()
 
   const [form, setForm] = useState({
-    name: '', ingredients: '', calories: '', protein: '', carbs: '', fat: '',
+    name: '', calories: '', protein: '', carbs: '', fat: '',
     instructions: '', category: 'Dinner', servings: '1', tags: '',
   })
+  const [ingredientRows, setIngredientRows] = useState<IngredientFormRow[]>([emptyIngredientRow()])
 
   const handleSearch = () => {
     setFilters(searchInput.trim() ? { search_term: searchInput.trim() } : {})
+  }
+
+  const updateIngredientRow = (index: number, field: keyof IngredientFormRow, value: string) => {
+    setIngredientRows((rows) => rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)))
+  }
+
+  const addIngredientRow = () => setIngredientRows((rows) => [...rows, emptyIngredientRow()])
+
+  const removeIngredientRow = (index: number) => {
+    setIngredientRows((rows) => rows.filter((_, i) => i !== index))
   }
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const req: AddMealRequest = {
       name: form.name,
-      ingredients: form.ingredients.split(',').map((s) => s.trim()).filter(Boolean),
+      ingredients: toMealIngredients(ingredientRows),
       macros: {
         calories: parseInt(form.calories) || 0,
         protein: parseInt(form.protein) || 0,
@@ -43,7 +86,8 @@ export function MealsPage() {
     addMeal.mutate(req, {
       onSuccess: () => {
         setShowAdd(false)
-        setForm({ name: '', ingredients: '', calories: '', protein: '', carbs: '', fat: '', instructions: '', category: 'Dinner', servings: '1', tags: '' })
+        setForm({ name: '', calories: '', protein: '', carbs: '', fat: '', instructions: '', category: 'Dinner', servings: '1', tags: '' })
+        setIngredientRows([emptyIngredientRow()])
       },
     })
   }
@@ -85,8 +129,65 @@ export function MealsPage() {
             <input id="meal-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
           <div>
-            <label htmlFor="meal-ingredients" className="block text-sm text-gray-600 mb-1">Ingredients (comma-separated)</label>
-            <input id="meal-ingredients" value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+            <div className="flex items-center justify-between mb-1">
+              <span className="block text-sm text-gray-600">Ingredients</span>
+              <Button type="button" variant="outline" size="sm" onClick={addIngredientRow}>
+                Add ingredient
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {ingredientRows.map((row, index) => (
+                <div key={index} className="grid grid-cols-8 gap-2 items-end">
+                  <div className="col-span-2">
+                    <label htmlFor={`ingredient-name-${index}`} className="block text-xs text-muted-foreground mb-1">
+                      Ingredient {index + 1} name
+                    </label>
+                    <input
+                      id={`ingredient-name-${index}`}
+                      value={row.name}
+                      onChange={(e) => updateIngredientRow(index, 'name', e.target.value)}
+                      className={ingredientInputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={`ingredient-serving-${index}`} className="block text-xs text-muted-foreground mb-1">
+                      Ingredient {index + 1} serving
+                    </label>
+                    <input
+                      id={`ingredient-serving-${index}`}
+                      value={row.serving}
+                      onChange={(e) => updateIngredientRow(index, 'serving', e.target.value)}
+                      className={ingredientInputClassName}
+                      placeholder="1 cup"
+                    />
+                  </div>
+                  {(['calories', 'protein', 'carbs', 'fat'] as const).map((macro) => (
+                    <div key={macro}>
+                      <label htmlFor={`ingredient-${macro}-${index}`} className="block text-xs text-muted-foreground mb-1 capitalize">
+                        Ingredient {index + 1} {macro}
+                      </label>
+                      <input
+                        id={`ingredient-${macro}-${index}`}
+                        type="number"
+                        min="0"
+                        value={row[macro]}
+                        onChange={(e) => updateIngredientRow(index, macro, e.target.value)}
+                        className={ingredientInputClassName}
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={ingredientRows.length === 1}
+                    onClick={() => removeIngredientRow(index)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-4 gap-2">
             {(['calories', 'protein', 'carbs', 'fat'] as const).map((macro) => (

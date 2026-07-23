@@ -1,4 +1,5 @@
 import { Card } from '@/components/Card'
+import { Table } from '@/components/Table'
 import type { MealResponse } from '@/api/types'
 import { StatTile, MacroBar } from '@/features/meals/MacroDisplay'
 
@@ -28,24 +29,29 @@ export function MealDetail({ meal }: { meal: MealResponse }) {
         />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <h2 className="font-semibold mb-2">Ingredients</h2>
-          <ul className="list-disc pl-5 text-sm text-foreground space-y-1">
-            {meal.ingredients.map((ingredient) => (
-              <li key={ingredient}>{ingredient}</li>
-            ))}
-          </ul>
-        </Card>
-        <Card>
-          <h2 className="font-semibold mb-2">Instructions</h2>
-          <ol className="list-decimal pl-5 text-sm text-foreground space-y-1">
-            {meal.instructions.map((step, index) => (
-              <li key={index}>{step}</li>
-            ))}
-          </ol>
-        </Card>
-      </div>
+      <Card className="mb-4">
+        <h2 className="font-semibold mb-2">Ingredients</h2>
+        <Table
+          columns={[
+            { key: 'name', header: 'Ingredient' },
+            { key: 'serving', header: 'Serving' },
+            { key: 'calories', header: 'Calories' },
+            { key: 'protein', header: 'Protein', render: (v) => `${v}g` },
+            { key: 'carbs', header: 'Carbs', render: (v) => `${v}g` },
+            { key: 'fat', header: 'Fat', render: (v) => `${v}g` },
+          ]}
+          rows={meal.ingredients as unknown as Record<string, unknown>[]}
+        />
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold mb-2">Instructions</h2>
+        <ol className="list-decimal pl-5 text-sm text-foreground space-y-1">
+          {meal.instructions.map((step, index) => (
+            <li key={index}>{step}</li>
+          ))}
+        </ol>
+      </Card>
 
       {meal.tags.length > 0 && (
         <div className="mt-4 flex gap-2 flex-wrap">
