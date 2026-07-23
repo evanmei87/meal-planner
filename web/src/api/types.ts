@@ -94,6 +94,34 @@ export interface GroceriesResponse {
   review_count: number
 }
 
+export interface ExerciseItem {
+  id: string
+  type: 'running'
+  distance_miles: number
+  duration_minutes: number
+  calories: number
+  notes?: string | null
+}
+
+export interface ExerciseDayPlan {
+  date: string
+  day_name: string
+  exercises: ExerciseItem[]
+  total_calories: number
+}
+
+export interface ExerciseWeekResponse {
+  week_start: string
+  days: ExerciseDayPlan[]
+}
+
+export interface AddExerciseRequest {
+  date: string
+  distance_miles: number
+  duration_minutes: number
+  notes?: string
+}
+
 export interface AppState {
   current_day: string
   plan_id: string

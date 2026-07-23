@@ -1,7 +1,10 @@
 import type {
+  AddExerciseRequest,
   AddMealRequest,
   AddMealResponse,
   AppState,
+  ExerciseItem,
+  ExerciseWeekResponse,
   GroceriesResponse,
   MealPlanRequest,
   MealPlanResponse,
@@ -81,5 +84,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ text }),
       }),
+  },
+  exercises: {
+    getWeek: (weekStart: string) =>
+      request<ExerciseWeekResponse>(`/exercises/?week_start=${weekStart}`),
+    add: (body: AddExerciseRequest) =>
+      request<ExerciseItem>('/exercises/', { method: 'POST', body: JSON.stringify(body) }),
   },
 }
