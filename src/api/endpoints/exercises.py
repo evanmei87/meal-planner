@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.models import AddExerciseRequest, ExerciseItem, ExerciseWeekResponse, UpdateExerciseRequest
-from src.tools.calculate_exercise_calories import estimate_running_calories
+from src.tools.calculate_exercise_calories import estimate_calories
 from src.tools.exercise_storage import (
     add_exercise,
     delete_exercise,
@@ -62,18 +62,20 @@ async def get_exercise_week(
 @router.post("/", response_model=ExerciseItem)
 async def add_exercise_endpoint(request: AddExerciseRequest):
     """
-    Add a running exercise to a given date.
+    Add an exercise to a given date.
 
     Args:
-        request: AddExerciseRequest with date, distance, duration, and notes
+        request: AddExerciseRequest with date, type, distance/duration or
+                 sets/reps, and notes
 
     Returns:
-        The created ExerciseItem, with calories estimated from distance.
+        The created ExerciseItem, with calories estimated for its type.
 
     Example:
         POST /exercises/
         {
             "date": "2026-06-22",
+            "type": "running",
             "distance_miles": 3.1,
             "duration_minutes": 28
         }
@@ -84,10 +86,12 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
 
         exercise = {
             "id": uuid.uuid4().hex,
-            "type": "running",
+            "type": request.type,
             "distance_miles": request.distance_miles,
             "duration_minutes": request.duration_minutes,
-            "calories": estimate_running_calories(request.distance_miles),
+            "sets": request.sets,
+            "reps": request.reps,
+            "calories": estimate_calories(request.type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
         }
         add_exercise(data, request.date, exercise)
@@ -105,21 +109,23 @@ async def add_exercise_endpoint(request: AddExerciseRequest):
 @router.put("/{exercise_id}", response_model=ExerciseItem)
 async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequest):
     """
-    Update an existing exercise's distance, duration, and notes.
+    Update an existing exercise's type, distance/duration or sets/reps, and notes.
 
     The exercise stays on its existing day; moving it to a different day
     is out of scope (see issue #36).
 
     Args:
         exercise_id: id of the exercise to update
-        request: UpdateExerciseRequest with distance, duration, and notes
+        request: UpdateExerciseRequest with type, distance/duration or
+                 sets/reps, and notes
 
     Returns:
-        The updated ExerciseItem, with calories recalculated from distance.
+        The updated ExerciseItem, with calories recalculated for its type.
 
     Example:
         PUT /exercises/abc123
         {
+            "type": "running",
             "distance_miles": 5.0,
             "duration_minutes": 45
         }
@@ -132,9 +138,12 @@ async def update_exercise_endpoint(exercise_id: str, request: UpdateExerciseRequ
             raise HTTPException(status_code=404, detail="Exercise not found")
 
         updates = {
+            "type": request.type,
             "distance_miles": request.distance_miles,
             "duration_minutes": request.duration_minutes,
-            "calories": estimate_running_calories(request.distance_miles),
+            "sets": request.sets,
+            "reps": request.reps,
+            "calories": estimate_calories(request.type, request.distance_miles, request.duration_minutes),
             "notes": request.notes,
         }
         exercise = update_exercise(data, exercise_id, updates)
