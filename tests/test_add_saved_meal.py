@@ -88,7 +88,7 @@ def test_load_recipes_parses_row():
     assert meals[0]['category'] == 'Dinner'
     assert meals[0]['macros']['calories'] == 500
     assert meals[0]['macros']['protein'] == 40
-    assert 'Chicken Breast' in meals[0]['ingredients']
+    assert 'Chicken Breast' in [ing['name'] for ing in meals[0]['ingredients']]
     assert 'high_protein' in meals[0]['tags']
     assert meals[0]['servings'] == 1
 
@@ -212,3 +212,77 @@ def test_add_meal_defaults_servings_to_one(tmp_path, monkeypatch):
     meals = load_recipes(recipes_path.read_text())
     saved = next(m for m in meals if m['name'] == 'No Servings Meal')
     assert saved['servings'] == 1
+
+
+# --- structured ingredients: write path + round-trip ---
+
+def test_add_meal_writes_structured_ingredients(tmp_path, monkeypatch):
+    """Structured ingredient dicts (the API path) are written to the row and
+    survive a re-parse with their own serving size and macros intact."""
+    import tools.add_saved_meal as asm
+
+    recipes_path = tmp_path / "meal-recipes.md"
+    recipes_path.write_text(RECIPES_MD_HEADER)
+    monkeypatch.setattr(asm, 'load_static_data', lambda: {
+        'food_db': '', 'specialty': SPECIALTY_MD, 'recipes': recipes_path.read_text(),
+    })
+    monkeypatch.setattr(
+        asm, 'save_recipes',
+        lambda content, _path: bool(recipes_path.write_text(content)) or True,
+    )
+
+    result = add_saved_meal_from_request({
+        'name': 'Structured Bowl',
+        'ingredients': [
+            {'name': 'Chicken Thighs', 'serving': '6 oz', 'calories': 280, 'protein': 38, 'carbs': 0, 'fat': 12},
+            {'name': 'White Rice', 'serving': '1 cup', 'calories': 205, 'protein': 4, 'carbs': 45, 'fat': 0},
+        ],
+        'macros': {'calories': 500, 'protein': 42, 'carbs': 45, 'fat': 12},
+        'instructions': ['Cook chicken', 'Cook rice'],
+        'category': 'Dinner',
+        'tags': ['high_protein'],
+        'servings': 1,
+    }, prompt_session=False)
+
+    assert result['success'] is True
+    meals = load_recipes(recipes_path.read_text())
+    saved = next(m for m in meals if m['name'] == 'Structured Bowl')
+    assert saved['ingredients'] == [
+        {'name': 'Chicken Thighs', 'serving': '6 oz', 'calories': 280, 'protein': 38, 'carbs': 0, 'fat': 12},
+        {'name': 'White Rice', 'serving': '1 cup', 'calories': 205, 'protein': 4, 'carbs': 45, 'fat': 0},
+    ]
+
+
+def test_add_meal_structured_ingredients_skip_specialty_lookup(tmp_path, monkeypatch):
+    """A structured ingredient not present in specialty-ingredients.md is
+    still written with its own supplied macros, without prompting."""
+    import tools.add_saved_meal as asm
+
+    recipes_path = tmp_path / "meal-recipes.md"
+    recipes_path.write_text(RECIPES_MD_HEADER)
+    monkeypatch.setattr(asm, 'load_static_data', lambda: {
+        'food_db': '', 'specialty': SPECIALTY_MD, 'recipes': recipes_path.read_text(),
+    })
+    monkeypatch.setattr(
+        asm, 'save_recipes',
+        lambda content, _path: bool(recipes_path.write_text(content)) or True,
+    )
+
+    result = add_saved_meal_from_request({
+        'name': 'Novel Ingredient Bowl',
+        'ingredients': [
+            {'name': 'Dragon Fruit', 'serving': '1 cup', 'calories': 60, 'protein': 1, 'carbs': 13, 'fat': 0},
+        ],
+        'macros': {'calories': 60, 'protein': 1, 'carbs': 13, 'fat': 0},
+        'instructions': ['Slice it'],
+        'category': 'Snack',
+    }, prompt_session=False)
+
+    meals = load_recipes(recipes_path.read_text())
+    saved = next(m for m in meals if m['name'] == 'Novel Ingredient Bowl')
+    assert saved['ingredients'] == [
+        {'name': 'Dragon Fruit', 'serving': '1 cup', 'calories': 60, 'protein': 1, 'carbs': 13, 'fat': 0},
+    ]
+    # Structured ingredients don't go through the specialty-ingredients.md
+    # auto-add flow, so this ingredient is never reported as newly_added.
+    assert result['newly_added'] == []

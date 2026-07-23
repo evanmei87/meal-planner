@@ -78,10 +78,20 @@ class TDEEResponse(BaseModel):
     activity_factor: float
 
 
+class MealIngredient(BaseModel):
+    """A single structured ingredient: name plus its own serving size and macros."""
+    name: str = Field(..., min_length=1, description="Ingredient name")
+    serving: str = Field(default="", description="Serving size, e.g. '6 oz' or '1 cup'")
+    calories: int = Field(default=0, ge=0)
+    protein: int = Field(default=0, ge=0)
+    carbs: int = Field(default=0, ge=0)
+    fat: int = Field(default=0, ge=0)
+
+
 class AddMealRequest(BaseModel):
     """Request to add a saved meal."""
     name: str = Field(..., min_length=1, description="Meal name")
-    ingredients: List[str] = Field(..., min_length=1, description="List of ingredients")
+    ingredients: List[MealIngredient] = Field(..., min_length=1, description="Structured ingredients")
     macros: dict = Field(..., description="Macros with keys: calories, protein, carbs, fat")
     instructions: List[str] = Field(..., min_length=1, description="Cooking instructions")
     category: str = Field(default="Dinner", description="Meal category")
@@ -105,7 +115,7 @@ class MealResponse(BaseModel):
     category: str
     servings: int = Field(default=1, ge=1)
     macros: dict
-    ingredients: List[str]
+    ingredients: List[MealIngredient]
     instructions: List[str]
     tags: List[str]
 

@@ -43,6 +43,15 @@ def load_recipes(recipes_content: str) -> list:
     return meals
 
 
+def _ingredient_name(ingredient) -> str:
+    """Return an ingredient's name whether given as a plain string (legacy
+    CLI usage) or a structured {name, serving, calories, protein, carbs, fat}
+    dict (API usage)."""
+    if isinstance(ingredient, dict):
+        return str(ingredient.get('name', '')).strip()
+    return str(ingredient).strip()
+
+
 _SPECIALTY_CACHE = None
 
 
@@ -199,7 +208,7 @@ def validate_meal_params(meal_name: str, ingredients: list,
     if not meal_name or not meal_name.strip():
         errors.append("Meal name is required and cannot be empty.")
 
-    if not ingredients or all(not ing.strip() for ing in ingredients):
+    if not ingredients or all(not _ingredient_name(ing) for ing in ingredients):
         errors.append("At least one ingredient is required.")
 
     if not instructions or all(not inst.strip() for inst in instructions):
@@ -234,7 +243,11 @@ def add_saved_meal(meal_name: str, ingredients: list,
 
     Args:
         meal_name: Name of the meal
-        ingredients: List of ingredient food names
+        ingredients: List of ingredients, either plain food-name strings
+            (looked up in specialty-ingredients.md, prompting for new ones
+            when prompt_session is truthy) or structured dicts
+            {name, serving, calories, protein, carbs, fat} that already
+            carry their own macros (API path; no specialty lookup needed)
         macros: Dictionary with keys: calories, protein, carbs, fat
         instructions: List of instruction steps
         category: Meal category (Breakfast/Lunch/Dinner/etc.)
@@ -279,12 +292,34 @@ def add_saved_meal(meal_name: str, ingredients: list,
     recipes_content = static_data['recipes']
 
     newly_added = []
+    resolved_ingredients = []  # {name, serving, calories, protein, carbs, fat} for the row
 
     # Process each ingredient
     for ingredient in ingredients:
+        if isinstance(ingredient, dict):
+            # Structured ingredient (API path): it already carries its own
+            # serving size and macros, so the specialty-ingredients.md
+            # lookup/auto-add flow below (which only applies to plain names)
+            # is skipped entirely.
+            name = _ingredient_name(ingredient)
+            if not name:
+                continue
+            resolved_ingredients.append({
+                'name': name,
+                'serving': str(ingredient.get('serving') or ''),
+                'calories': int(ingredient.get('calories') or 0),
+                'protein': int(ingredient.get('protein') or 0),
+                'carbs': int(ingredient.get('carbs') or 0),
+                'fat': int(ingredient.get('fat') or 0),
+            })
+            continue
+
         ingredient_clean = ingredient.strip()
         if not ingredient_clean:
             continue
+
+        ingredient_serving = ''
+        ingredient_macros = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
 
         # Check if food exists in specialty-ingredients.md
         if not food_exists(ingredient_clean, specialty_content):
@@ -304,6 +339,8 @@ def add_saved_meal(meal_name: str, ingredients: list,
                     print(f"Warning: Failed to add '{ingredient_clean}' to specialty ingredients.")
 
                 newly_added.append(ingredient_clean)
+                ingredient_serving = macros_data.get('portion', '')
+                ingredient_macros = {k: macros_data.get(k, 0) for k in ('calories', 'protein', 'carbs', 'fat')}
             else:
                 # Auto-add without prompting
                 newly_added.append(ingredient_clean)
@@ -312,13 +349,24 @@ def add_saved_meal(meal_name: str, ingredients: list,
             existing_macros = get_food_macros(ingredient_clean, specialty_content)
             if existing_macros and all(existing_macros.values()):
                 macros = existing_macros
+                ingredient_serving = existing_macros.get('portion', '')
+                ingredient_macros = {k: existing_macros.get(k, 0) for k in ('calories', 'protein', 'carbs', 'fat')}
             else:
                 newly_added.append(ingredient_clean)
-    
+
+        resolved_ingredients.append({
+            'name': ingredient_clean,
+            'serving': ingredient_serving,
+            **ingredient_macros,
+        })
+
     # Create new row for meal
     timestamp = datetime.now().isoformat()
-    
-    ingredients_str = ', '.join(ingredient.strip() for ingredient in ingredients if ingredient.strip())
+
+    ingredients_str = ', '.join(
+        f"{ing['name']}:{ing['serving']}:{ing['calories']}:{ing['protein']}:{ing['carbs']}:{ing['fat']}"
+        for ing in resolved_ingredients
+    )
     macros_str = f"{macros.get('calories', 0)},{macros.get('protein', 0)},{macros.get('carbs', 0)},{macros.get('fat', 0)}"
     instructions_str = '; '.join(instructions) if instructions else 'Not specified'
     
@@ -359,7 +407,8 @@ def add_saved_meal_from_request(meal_data: dict, prompt_session=False) -> dict:
     Args:
         meal_data: Dictionary with keys:
             - name: Meal name
-            - ingredients: List of ingredient names
+            - ingredients: List of structured ingredient dicts
+              {name, serving, calories, protein, carbs, fat}
             - macros: Dict with calories, protein, carbs, fat
             - instructions: List of instruction steps
             - category: Meal category (default: Dinner)

@@ -24,7 +24,11 @@ async def add_meal(request: AddMealRequest):
         POST /meals/add
         {
             "name": "Chicken Stir-fry",
-            "ingredients": ["Chicken", "Vegetables", "Soy Sauce"],
+            "ingredients": [
+                {"name": "Chicken", "serving": "6 oz", "calories": 280, "protein": 38, "carbs": 0, "fat": 12},
+                {"name": "Vegetables", "serving": "1 cup", "calories": 50, "protein": 2, "carbs": 10, "fat": 0},
+                {"name": "Soy Sauce", "serving": "1 tbsp", "calories": 10, "protein": 1, "carbs": 1, "fat": 0}
+            ],
             "macros": {"calories": 500, "protein": 30, "carbs": 20, "fat": 15},
             "instructions": ["Cook chicken", "Add vegetables", "Season with soy sauce"],
             "category": "Dinner",
@@ -34,7 +38,7 @@ async def add_meal(request: AddMealRequest):
     try:
         meal_data = {
             'name': request.name,
-            'ingredients': request.ingredients,
+            'ingredients': [ingredient.model_dump() for ingredient in request.ingredients],
             'macros': request.macros,
             'instructions': request.instructions,
             'category': request.category,

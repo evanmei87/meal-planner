@@ -90,7 +90,11 @@ def sample_meal():
         'version': '2024-01-01T00:00:00',
         'category': 'Dinner',
         'macros': {'calories': 500, 'protein': 30, 'carbs': 20, 'fat': 15},
-        'ingredients': ['Chicken', 'Vegetables', 'Soy Sauce'],
+        'ingredients': [
+            {'name': 'Chicken', 'serving': '6 oz', 'calories': 280, 'protein': 38, 'carbs': 0, 'fat': 12},
+            {'name': 'Vegetables', 'serving': '1 cup', 'calories': 50, 'protein': 2, 'carbs': 10, 'fat': 0},
+            {'name': 'Soy Sauce', 'serving': '1 tbsp', 'calories': 10, 'protein': 1, 'carbs': 1, 'fat': 0},
+        ],
         'instructions': ['Cook chicken', 'Add vegetables', 'Season with soy sauce'],
         'tags': ['quick', 'healthy']
     }
