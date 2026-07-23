@@ -2,6 +2,11 @@
 # Format: Markdown Table
 # Columns: name|version|category|servings|macros (cal,prot,carb,fat)|ingredients|instructions|tags
 # Ingredients cell: comma-separated "name:serving:calories:protein:carbs:fat" entries (see src/tools/recipe_format.py)
+# NOTE (#45): per-ingredient macros are independent "typical reference value" estimates
+# added during the structured-ingredients migration, not derived from the meal-level
+# macros column. They are not guaranteed to sum to that column's values -- several rows
+# (e.g. Salmon & Quinoa, Greek Yogurt Bowl, Tofu Stir-fry) currently diverge by double
+# digits or more.
 
 | name | version | category | servings | macros | ingredients | instructions | tags |
 |:---:|:---:|:---:|:---:|:---|:---:|:---:|:---:|

@@ -15,6 +15,7 @@ from tools.generate_plan import (
     update_plan_in_state,
     _excluded_terms,
     _meal_allowed,
+    _build_candidate_meals,
     generate_meal_plan_from_request,
 )
 
@@ -177,6 +178,50 @@ def test_generate_plan_uses_normalized_exclusions_over_keyword_parse(tmp_path, m
 
     all_meal_names = [m['name'] for day in result['plan'] for m in day['meals']]
     assert not any('salmon' in name.lower() for name in all_meal_names)
+
+
+def test_build_candidate_meals_flattens_structured_ingredients_and_preserves_scoring(monkeypatch):
+    """Saved meals store structured ingredient dicts ({name, serving, calories,
+    protein, carbs, fat}); _build_candidate_meals must reduce them to plain
+    name strings, and inventory-overlap scoring must still key off that name
+    the same way it did for the old plain-string ingredient format.
+    """
+    saved_meals = [
+        {
+            'name': 'Custom Tofu Bowl',
+            'category': 'lunch',
+            'macros': {'calories': 500, 'protein': 30, 'carbs': 40, 'fat': 15},
+            'ingredients': [
+                {'name': 'Tofu', 'serving': '6 oz', 'calories': 150, 'protein': 15, 'carbs': 5, 'fat': 8},
+                {'name': 'Kale', 'serving': '1 cup', 'calories': 30, 'protein': 2, 'carbs': 5, 'fat': 0},
+            ],
+        },
+        {
+            'name': 'Custom No Match Bowl',
+            'category': 'lunch',
+            'macros': {'calories': 500, 'protein': 30, 'carbs': 40, 'fat': 15},
+            'ingredients': [
+                {'name': 'Zucchini', 'serving': '1 cup', 'calories': 30, 'protein': 2, 'carbs': 5, 'fat': 0},
+            ],
+        },
+    ]
+    monkeypatch.setattr('tools.generate_plan.load_saved_meals', lambda: saved_meals)
+
+    # Inventory contains only "tofu" -- an ingredient unique to one saved meal
+    # and absent from every hardcoded meal, so any scoring difference can only
+    # come from that meal's structured ingredient having been matched by name.
+    inventory = [{'standardized_item': 'tofu', 'raw_phrase': 'tofu'}]
+
+    candidates = _build_candidate_meals({}, inventory)
+
+    tofu_bowl = next(m for m in candidates if m['name'] == 'Custom Tofu Bowl')
+    assert tofu_bowl['ingredients'] == ['Tofu', 'Kale']
+    assert all(isinstance(ing, str) for ing in tofu_bowl['ingredients'])
+
+    # Scoring preservation: the meal with a name-matched inventory ingredient
+    # must outrank every meal with no match (score 0), landing first in the
+    # sorted candidate list -- exactly as it would with plain-string ingredients.
+    assert candidates[0]['name'] == 'Custom Tofu Bowl'
 
 
 def test_update_plan_in_state():
