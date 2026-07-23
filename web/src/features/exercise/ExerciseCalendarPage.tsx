@@ -5,14 +5,20 @@ import { ErrorBanner } from '@/components/ErrorBanner'
 import { Spinner } from '@/components/Spinner'
 import { ApiError } from '@/api/client'
 import { getTodayInEST, getCurrentWeekDates } from '@/features/exercise/dateUtils'
-import { useAddExercise, useDeleteExercise, useExerciseWeek, useUpdateExercise } from '@/features/exercise/hooks'
+import {
+  useAddExercise,
+  useDeleteExercise,
+  useExerciseWeek,
+  useSavePreset,
+  useUpdateExercise,
+} from '@/features/exercise/hooks'
 import {
   EXERCISE_TYPE_LABELS,
   EXERCISE_TYPE_ORDER,
   exerciseAccentVariants,
   exerciseSwatchVariants,
 } from '@/features/exercise/exerciseColors'
-import type { AddExerciseRequest, ExerciseDayPlan, ExerciseItem, ExerciseType } from '@/api/types'
+import type { AddExerciseRequest, ExerciseDayPlan, ExerciseItem, ExerciseType, PresetExercise } from '@/api/types'
 
 const inputClassName =
   'border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring'
@@ -46,6 +52,17 @@ function dayBadge(day: ExerciseDayPlan | undefined): string | null {
   return `${count} exercise${count === 1 ? '' : 's'} · ${day.total_calories} cal`
 }
 
+function toPresetExercise(exercise: ExerciseItem): PresetExercise {
+  return {
+    type: exercise.type,
+    distance_miles: exercise.distance_miles ?? undefined,
+    duration_minutes: exercise.duration_minutes,
+    sets: exercise.sets ?? undefined,
+    reps: exercise.reps ?? undefined,
+    notes: exercise.notes ?? undefined,
+  }
+}
+
 export function ExerciseCalendarPage() {
   const today = getTodayInEST()
   const week = getCurrentWeekDates()
@@ -58,11 +75,13 @@ export function ExerciseCalendarPage() {
   const [reps, setReps] = useState('')
   const [notes, setNotes] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [presetSaved, setPresetSaved] = useState(false)
 
   const { data, isLoading, isError, error } = useExerciseWeek(weekStart)
   const addExercise = useAddExercise(weekStart)
   const updateExercise = useUpdateExercise(weekStart)
   const deleteExercise = useDeleteExercise(weekStart)
+  const savePreset = useSavePreset()
 
   const selectedDay = data?.days.find((d) => d.date === selectedDate)
 
@@ -89,6 +108,20 @@ export function ExerciseCalendarPage() {
   function handleRemoveClick(exercise: ExerciseItem) {
     if (!window.confirm('Remove this exercise?')) return
     deleteExercise.mutate(exercise.id)
+  }
+
+  function handleSavePreset() {
+    if (!selectedDay) return
+    const exercises = selectedDay.exercises.map(toPresetExercise)
+    savePreset.mutate(
+      { dayName: selectedDay.day_name, exercises },
+      {
+        onSuccess: () => {
+          setPresetSaved(true)
+          setTimeout(() => setPresetSaved(false), 2000)
+        },
+      }
+    )
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -151,33 +184,47 @@ export function ExerciseCalendarPage() {
         {!selectedDay || selectedDay.exercises.length === 0 ? (
           <p className="text-sm text-muted-foreground mb-4">No exercises logged for this day.</p>
         ) : (
-          <ul className="mb-4 space-y-1">
-            {selectedDay.exercises.map((exercise) => (
-              <li
-                key={exercise.id}
-                className={`text-sm flex items-center gap-2 pl-2 py-1 ${exerciseAccentVariants({ type: exercise.type })}`}
+          <>
+            <ul className="mb-3 space-y-1">
+              {selectedDay.exercises.map((exercise) => (
+                <li
+                  key={exercise.id}
+                  className={`text-sm flex items-center gap-2 pl-2 py-1 ${exerciseAccentVariants({ type: exercise.type })}`}
+                >
+                  <span>{formatExerciseSummary(exercise)}</span>
+                  {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => handleEditClick(exercise)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="xs"
+                    onClick={() => handleRemoveClick(exercise)}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={handleSavePreset}
+                disabled={savePreset.isPending}
               >
-                <span>{formatExerciseSummary(exercise)}</span>
-                {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => handleEditClick(exercise)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="xs"
-                  onClick={() => handleRemoveClick(exercise)}
-                >
-                  Remove
-                </Button>
-              </li>
-            ))}
-          </ul>
+                {savePreset.isPending ? 'Saving…' : 'Save to preset'}
+              </Button>
+              {presetSaved && <span className="text-xs text-muted-foreground">Saved!</span>}
+            </div>
+          </>
         )}
 
         <form onSubmit={handleSubmit} className="flex gap-2 flex-wrap items-end">
@@ -294,6 +341,7 @@ export function ExerciseCalendarPage() {
         {addExercise.isError && <ErrorBanner message="Failed to add exercise" />}
         {updateExercise.isError && <ErrorBanner message="Failed to update exercise" />}
         {deleteExercise.isError && <ErrorBanner message="Failed to remove exercise" />}
+        {savePreset.isError && <ErrorBanner message="Failed to save preset" />}
       </Card>
     </div>
   )
