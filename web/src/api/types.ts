@@ -33,20 +33,29 @@ export interface MealPlanResponse {
   message?: string
 }
 
+export interface MealIngredient {
+  name: string
+  serving: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
 export interface MealResponse {
   name: string
   version: string
   category: string
   servings: number
   macros: { calories: number; protein: number; carbs: number; fat: number }
-  ingredients: string[]
+  ingredients: MealIngredient[]
   instructions: string[]
   tags: string[]
 }
 
 export interface AddMealRequest {
   name: string
-  ingredients: string[]
+  ingredients: MealIngredient[]
   macros: { calories: number; protein: number; carbs: number; fat: number }
   instructions: string[]
   category: string

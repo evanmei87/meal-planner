@@ -18,7 +18,10 @@ const SAVED_MEAL = {
   category: 'Dinner',
   servings: 1,
   macros: { calories: 500, protein: 35, carbs: 40, fat: 12 },
-  ingredients: ['Chicken', 'Rice'],
+  ingredients: [
+    { name: 'Chicken', serving: '6 oz', calories: 280, protein: 38, carbs: 0, fat: 12 },
+    { name: 'Rice', serving: '1 cup', calories: 200, protein: 4, carbs: 45, fat: 0 },
+  ],
   instructions: ['Cook chicken', 'Serve with rice'],
   tags: [],
 }
