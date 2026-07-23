@@ -20,23 +20,26 @@ def test_get_exercise_week_no_file_returns_seven_empty_days(client, api_key_head
 
 def test_add_exercise_returns_created_item(client, api_key_headers, temp_schedule_file):
     with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file):
-        response = client.post(
-            "/exercises/",
-            json={
-                "date": "2026-06-22",
-                "distance_miles": 3.1,
-                "duration_minutes": 28,
-                "notes": "easy morning run",
-            },
-            headers=api_key_headers
-        )
+        with patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+            mock_get_user_stats.return_value = {"weight_kg": 70.0}
+            response = client.post(
+                "/exercises/",
+                json={
+                    "date": "2026-06-22",
+                    "distance_miles": 3.1,
+                    "duration_minutes": 28,
+                    "notes": "easy morning run",
+                },
+                headers=api_key_headers
+            )
 
     assert response.status_code == 200
     data = response.json()
     assert data["type"] == "running"
     assert data["distance_miles"] == 3.1
     assert data["duration_minutes"] == 28
-    assert data["calories"] == 0
+    assert data["calories"] == round(70.0 * 3.1 * 1.668)
+    assert data["calories"] > 0
     assert data["notes"] == "easy morning run"
     assert data["id"]
 
