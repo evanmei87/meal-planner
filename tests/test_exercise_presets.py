@@ -85,7 +85,7 @@ def test_apply_presets_to_week_fills_empty_day():
     }]}}
 
     with patch('tools.exercise_presets.estimate_calories', return_value=300):
-        result = apply_presets_to_week(week_days, presets)
+        result = apply_presets_to_week(week_days, presets, stored_dates=set())
 
     assert len(result[0]["exercises"]) == 1
     filled = result[0]["exercises"][0]
@@ -110,10 +110,32 @@ def test_apply_presets_to_week_leaves_day_with_existing_exercises_untouched():
         "sets": None, "reps": None, "notes": None,
     }]}}
 
-    result = apply_presets_to_week(week_days, presets)
+    result = apply_presets_to_week(week_days, presets, stored_dates={"2026-06-22"})
 
     assert result[0]["exercises"] == [existing_exercise]
     assert result[0]["total_calories"] == 500
+
+
+def test_apply_presets_to_week_does_not_refill_a_stored_date_left_empty():
+    """A date already in storage — even with no exercises left, e.g. after
+    the user deleted a preset-filled day down to nothing — must never be
+    refilled. Storage presence, not current emptiness, is what marks a
+    day as taken over."""
+    week_days = [{
+        "date": "2026-06-22",
+        "day_name": "Monday",
+        "exercises": [],
+        "total_calories": 0,
+    }]
+    presets = {"presets": {"Monday": [{
+        "type": "running", "distance_miles": 3.1, "duration_minutes": 28,
+        "sets": None, "reps": None, "notes": None,
+    }]}}
+
+    result = apply_presets_to_week(week_days, presets, stored_dates={"2026-06-22"})
+
+    assert result[0]["exercises"] == []
+    assert result[0]["total_calories"] == 0
 
 
 def test_apply_presets_to_week_leaves_day_empty_when_no_preset_for_that_day():
@@ -124,7 +146,7 @@ def test_apply_presets_to_week_leaves_day_empty_when_no_preset_for_that_day():
         "total_calories": 0,
     }]
 
-    result = apply_presets_to_week(week_days, {"presets": {}})
+    result = apply_presets_to_week(week_days, {"presets": {}}, stored_dates=set())
 
     assert result[0]["exercises"] == []
     assert result[0]["total_calories"] == 0
@@ -142,7 +164,7 @@ def test_apply_presets_to_week_generates_distinct_ids_for_multiple_exercises():
         {"type": "strength", "distance_miles": None, "duration_minutes": 45, "sets": 3, "reps": 10, "notes": None},
     ]}}
 
-    result = apply_presets_to_week(week_days, presets)
+    result = apply_presets_to_week(week_days, presets, stored_dates=set())
 
     ids = [exercise["id"] for exercise in result[0]["exercises"]]
     assert len(ids) == 2

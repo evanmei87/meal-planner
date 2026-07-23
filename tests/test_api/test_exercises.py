@@ -409,3 +409,63 @@ def test_get_exercise_week_fills_day_with_no_stored_data_from_preset(
     assert filled["notes"] == "easy run"
     assert filled["id"]
     assert monday["total_calories"] == filled["calories"]
+
+
+def test_preset_filled_exercise_can_be_updated_and_deleted(
+    client, api_key_headers, temp_schedule_file, temp_presets_file
+):
+    """A preset-derived exercise returned by GET must be materialized into
+    storage with a real id, not fabricated fresh per-request — otherwise
+    PUT/DELETE against that id 404 immediately."""
+    Path(temp_presets_file).write_text(json.dumps({
+        "presets": {"Monday": [{
+            "type": "running", "distance_miles": 3.1, "duration_minutes": 28,
+            "sets": None, "reps": None, "notes": "easy run",
+        }]}
+    }))
+
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file), \
+         patch('src.api.endpoints.exercises.PRESETS_PATH', temp_presets_file), \
+         patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+        mock_get_user_stats.return_value = {"weight_kg": 70.0}
+
+        week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+        exercise_id = week_response.json()["days"][0]["exercises"][0]["id"]
+
+        update_response = client.put(
+            f"/exercises/{exercise_id}",
+            json={"distance_miles": 5.0, "duration_minutes": 45},
+            headers=api_key_headers
+        )
+        delete_response = client.delete(f"/exercises/{exercise_id}", headers=api_key_headers)
+
+    assert update_response.status_code == 200
+    assert update_response.json()["distance_miles"] == 5.0
+    assert delete_response.status_code == 204
+
+
+def test_get_exercise_week_does_not_refill_day_after_explicit_delete(
+    client, api_key_headers, temp_schedule_file, temp_presets_file
+):
+    """Once a preset-filled day's exercises are deleted, it must stay empty
+    on the next GET rather than being refilled from the preset again."""
+    Path(temp_presets_file).write_text(json.dumps({
+        "presets": {"Monday": [{
+            "type": "running", "distance_miles": 3.1, "duration_minutes": 28,
+            "sets": None, "reps": None, "notes": "easy run",
+        }]}
+    }))
+
+    with patch('src.api.endpoints.exercises.SCHEDULE_PATH', temp_schedule_file), \
+         patch('src.api.endpoints.exercises.PRESETS_PATH', temp_presets_file), \
+         patch('src.tools.calculate_exercise_calories.get_user_stats') as mock_get_user_stats:
+        mock_get_user_stats.return_value = {"weight_kg": 70.0}
+
+        first_week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+        exercise_id = first_week_response.json()["days"][0]["exercises"][0]["id"]
+
+        client.delete(f"/exercises/{exercise_id}", headers=api_key_headers)
+
+        second_week_response = client.get("/exercises/?week_start=2026-06-22", headers=api_key_headers)
+
+    assert second_week_response.json()["days"][0]["exercises"] == []

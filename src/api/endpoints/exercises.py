@@ -50,8 +50,12 @@ async def get_exercise_week(
                     to the Monday of the current server week.
 
     Returns:
-        ExerciseWeekResponse with 7 days. Days with no stored exercises
-        are pre-filled from that day-of-week's saved preset, if any.
+        ExerciseWeekResponse with 7 days. Days with no entry in storage
+        are pre-filled from that day-of-week's saved preset, if any. A
+        day filled this way is persisted immediately, so it behaves like
+        any other real, editable/deletable data from then on — including
+        staying empty on later requests if the user deletes everything
+        the preset filled in.
 
     Example:
         GET /exercises/?week_start=2026-06-22
@@ -60,11 +64,19 @@ async def get_exercise_week(
         if week_start is None:
             week_start = _current_week_start_est()
 
-        data = load_schedule(Path(SCHEDULE_PATH))
+        schedule_path = Path(SCHEDULE_PATH)
+        data = load_schedule(schedule_path)
         days = get_week(data, week_start)
+        stored_dates = set(data.get("days", {}).keys())
 
         presets = load_presets(Path(PRESETS_PATH))
-        days = apply_presets_to_week(days, presets)
+        days = apply_presets_to_week(days, presets, stored_dates)
+
+        newly_filled_days = [day for day in days if day["date"] not in stored_dates and day["exercises"]]
+        if newly_filled_days:
+            for day in newly_filled_days:
+                data.setdefault("days", {})[day["date"]] = day
+            save_schedule(schedule_path, data)
 
         return ExerciseWeekResponse(week_start=week_start, days=days)
     except Exception as e:
