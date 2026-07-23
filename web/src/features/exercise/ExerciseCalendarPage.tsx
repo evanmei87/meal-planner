@@ -6,18 +6,21 @@ import { Spinner } from '@/components/Spinner'
 import { ApiError } from '@/api/client'
 import { getTodayInEST, getCurrentWeekDates } from '@/features/exercise/dateUtils'
 import { useAddExercise, useDeleteExercise, useExerciseWeek, useUpdateExercise } from '@/features/exercise/hooks'
+import {
+  EXERCISE_TYPE_LABELS,
+  EXERCISE_TYPE_ORDER,
+  exerciseAccentVariants,
+  exerciseSwatchVariants,
+} from '@/features/exercise/exerciseColors'
 import type { AddExerciseRequest, ExerciseDayPlan, ExerciseItem, ExerciseType } from '@/api/types'
 
 const inputClassName =
   'border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring'
 
-const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = [
-  { value: 'running', label: 'Running' },
-  { value: 'walking', label: 'Walking' },
-  { value: 'biking', label: 'Biking' },
-  { value: 'swimming', label: 'Swimming' },
-  { value: 'strength', label: 'Strength' },
-]
+const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = EXERCISE_TYPE_ORDER.map((value) => ({
+  value,
+  label: EXERCISE_TYPE_LABELS[value],
+}))
 
 function usesSetsAndReps(type: ExerciseType): boolean {
   return type === 'strength'
@@ -136,12 +139,24 @@ export function ExerciseCalendarPage() {
       <Card>
         <p className="text-sm text-muted-foreground mb-3">Exercises for {selectedDate}</p>
 
+        <ul className="flex gap-3 flex-wrap mb-3" aria-label="Exercise type legend">
+          {EXERCISE_TYPE_ORDER.map((type) => (
+            <li key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className={exerciseSwatchVariants({ type })} aria-hidden="true" />
+              {EXERCISE_TYPE_LABELS[type]}
+            </li>
+          ))}
+        </ul>
+
         {!selectedDay || selectedDay.exercises.length === 0 ? (
           <p className="text-sm text-muted-foreground mb-4">No exercises logged for this day.</p>
         ) : (
           <ul className="mb-4 space-y-1">
             {selectedDay.exercises.map((exercise) => (
-              <li key={exercise.id} className="text-sm flex items-center gap-2">
+              <li
+                key={exercise.id}
+                className={`text-sm flex items-center gap-2 pl-2 py-1 ${exerciseAccentVariants({ type: exercise.type })}`}
+              >
                 <span>{formatExerciseSummary(exercise)}</span>
                 {exercise.notes && <span className="text-muted-foreground"> — {exercise.notes}</span>}
                 <Button

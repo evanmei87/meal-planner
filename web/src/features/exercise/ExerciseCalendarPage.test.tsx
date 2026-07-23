@@ -100,6 +100,28 @@ describe('ExerciseCalendarPage', () => {
     expect(screen.getByText('5 mi · 45 min · 500 cal')).toBeInTheDocument()
   })
 
+  it('renders a left-border accent color matching each exercise type', async () => {
+    const week = emptyWeek()
+    week.days[2] = {
+      date: '2026-06-24',
+      day_name: 'Wednesday',
+      exercises: [
+        { id: 'ex1', type: 'running', distance_miles: 3.1, duration_minutes: 28, calories: 320, notes: null },
+        { id: 'ex2', type: 'strength', sets: 3, reps: 10, duration_minutes: 20, calories: 180, notes: null },
+      ],
+      total_calories: 500,
+    }
+    server.use(http.get('http://localhost/api/exercises/', () => HttpResponse.json(week)))
+    renderExercisePage()
+
+    const runningRow = (await screen.findByText('3.1 mi · 28 min · 320 cal')).closest('li')
+    const strengthRow = (await screen.findByText('3 sets × 10 reps · 20 min · 180 cal')).closest('li')
+
+    expect(runningRow?.className).toContain('border-exercise-running')
+    expect(strengthRow?.className).toContain('border-exercise-strength')
+    expect(runningRow?.className).not.toContain('border-exercise-strength')
+  })
+
   it('submitting the form posts a new exercise and it appears after refetch', async () => {
     let week = emptyWeek()
     server.use(
