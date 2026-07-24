@@ -28,7 +28,9 @@ STATE_PATH = str(Path(__file__).parent / "state" / "state.json")
 DATA_DIR = Path(__file__).parent / "data"
 
 API_SERVER_URL = os.getenv("MEAL_PLANNER_API_URL", "http://localhost:8000")
-API_KEY = os.getenv("MEAL_PLANNER_API_KEY", "dev-key-change-in-production")
+API_KEY = os.getenv("MEAL_PLANNER_API_KEY")
+if not API_KEY:
+    raise RuntimeError("MEAL_PLANNER_API_KEY environment variable must be set")
 
 
 def load_profile_text() -> str:

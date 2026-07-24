@@ -19,8 +19,9 @@ app = FastAPI(
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-# Get API key from environment or use default
-API_KEY = os.getenv("MEAL_PLANNER_API_KEY", "dev-key-change-in-production")
+API_KEY = os.getenv("MEAL_PLANNER_API_KEY")
+if not API_KEY:
+    raise RuntimeError("MEAL_PLANNER_API_KEY environment variable must be set")
 
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):

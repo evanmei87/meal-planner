@@ -1,8 +1,11 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from pathlib import Path
 import json
 import tempfile
+
+os.environ.setdefault("MEAL_PLANNER_API_KEY", "dev-key-change-in-production")
 
 from src.api.main import app
 

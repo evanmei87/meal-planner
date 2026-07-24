@@ -132,5 +132,5 @@ The API is available at `http://localhost:8000`. Interactive API docs are at `ht
 Authenticated endpoints require the `X-API-Key` header:
 
 ```bash
-curl -H "X-API-Key: dev-key-change-in-production" http://localhost:8000/state/
+curl -H "X-API-Key: $MEAL_PLANNER_API_KEY" http://localhost:8000/state/
 ```
