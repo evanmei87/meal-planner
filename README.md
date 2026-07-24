@@ -56,11 +56,11 @@ nano .env
 Your `.env` should contain:
 
 ```env
-MEAL_PLANNER_API_KEY=dev-key-change-in-production
+MEAL_PLANNER_API_KEY=your-own-random-secret
 GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
-- `MEAL_PLANNER_API_KEY` — required by the API server. For local development, `dev-key-change-in-production` is the default.
+- `MEAL_PLANNER_API_KEY` — required by the API server; the server refuses to start if it's unset. Generate your own value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(32))"` — don't reuse the placeholder from `.env.example`.
 - `GEMINI_API_KEY` — used for LLM-backed grocery parsing. Create one at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
 **Frontend** — copy the web example:
@@ -72,7 +72,7 @@ cp web/.env.example web/.env
 Your `web/.env` should contain:
 
 ```env
-VITE_API_KEY=dev-key-change-in-production
+VITE_API_KEY=your-own-random-secret
 ```
 
 This must match `MEAL_PLANNER_API_KEY` in your backend `.env`.
